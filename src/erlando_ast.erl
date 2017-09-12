@@ -55,13 +55,10 @@ attributes(Attribute, Forms) ->
               Acc
       end, [], Forms).
 
--spec map_reduce(fun((_Type, Node, State) -> error_m:error_m(any(), {Node, State})), State, Form) ->
-                        error_m:error_m(any(), {Form, State}).
+-spec map_reduce(fun((_Type, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
 map_reduce(F, Init, Forms) ->
-    ST = state_t:new(identity_m),
-    STNode = traverse(
-               ST, fun(Type, Node) -> state_t:state_t(fun(State) -> F(Type, Node, State) end) end, Forms),
-    state_t:run_state(STNode, Init, ST).
+    STNode = traverse(erlando_ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
+    erlando_ast_state:run(STNode, Init).
 
 -spec traverse(fun((Node, _Type) -> Node), Form) -> Form.
 traverse(F, Forms) ->
@@ -69,38 +66,48 @@ traverse(F, Forms) ->
 
 -spec traverse(M, fun((_Type, Node) -> monad:monadic(M, Node)), Form) -> monad:monadic(M, Form) when M :: monad:monad().
 traverse(Monad, F, Forms) ->
-    do_traverse(Monad, F, Forms, fun erlando_ast_lens:forms/1).
+    do_traverse(Monad, F, Forms, forms).
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-do_traverse(Monad, F, XNode, Visitor) ->
+do_traverse(Monad, F, XNode, NodeType) ->
     %% do form
     %% do([Monad ||
     %%           YNode <- F(pre, XNode),
-    %%           ZNode <- fold_children(Monad, F, YNode, Visitor),
+    %%           ZNode <- fold_children(Monad, F, YNode, erlando_ast_lens:node_lens(XNodeType, YNode)),
     %%           F(post, ZNode)
     %%    ]).
-    monad:bind(
-      Monad,F(pre, XNode),
+    monad_bind(
+      Monad,
+      F(pre, XNode),
       fun(YNode) ->
-              monad:bind(
+              monad_bind(
                 Monad,
-                fold_children(Monad, F, YNode, Visitor(YNode)),
+                %% type of y node should be same as type of x node
+                fold_children(Monad, F, YNode, NodeType),
                 fun(ZNode) ->
                         F(post, ZNode)
                 end)
       end).
 
-fold_children(Monad, F, Node, ChildrenLens) ->
+fold_children(Monad, F, Node, NodeType) ->
+    ChildrenLens = erlando_ast_lens:children_lens(NodeType, Node),
     lists:foldl( 
-      fun({Visitor, ChildLens}, MNode) ->
-              monad:bind(
+      fun({ChildNodeType, ChildLens}, MNode) ->
+              monad_bind(
                 Monad, MNode,
                 fun(NodeAcc) ->
                         (erlando_ast_lens:modify(Monad, ChildLens, 
                                          fun(Child) ->
-                                                 do_traverse(Monad, F, Child, Visitor)
+                                                 do_traverse(Monad, F, Child, ChildNodeType)
                                          end))(NodeAcc)
                           end)
       end, monad:return(Monad, Node), ChildrenLens).
+
+%% same as monad:bind/3
+monad_bind({MonadT, InnerM}, F, X) ->
+    MonadT:'>>='(F, X, InnerM);
+monad_bind(Monad, F, X) ->
+    Monad:'>>='(F, X).
+
