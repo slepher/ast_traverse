@@ -47,6 +47,7 @@ map(F, Forms) ->
 reduce(F, Init, Forms) ->
     map_reduce(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, Forms).
 
+%% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
 read(Module) when is_atom(Module) ->
     case beam_lib:chunks(code:which(Module), [abstract_code]) of
