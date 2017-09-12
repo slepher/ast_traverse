@@ -58,7 +58,7 @@ attributes(Attribute, Forms) ->
 -spec map_reduce(fun((_Type, Node, State) -> error_m:error_m(any(), {Node, State})), State, Form) ->
                         error_m:error_m(any(), {Form, State}).
 map_reduce(F, Init, Forms) ->
-    ST = state_t:new(error_m),
+    ST = state_t:new(identity_m),
     STNode = traverse(
                ST, fun(Type, Node) -> state_t:state_t(fun(State) -> F(Type, Node, State) end) end, Forms),
     state_t:run_state(STNode, Init, ST).
@@ -77,9 +77,9 @@ traverse(Monad, F, Forms) ->
 do_traverse(Monad, F, XNode, Visitor) ->
     %% do form
     %% do([Monad ||
-    %%           F(pre, Node),
-    %%           NNode <- fold_children(Monad, F, NNode, ChildrenLens),
-    %%           F(post, NNode)
+    %%           YNode <- F(pre, XNode),
+    %%           ZNode <- fold_children(Monad, F, YNode, Visitor),
+    %%           F(post, ZNode)
     %%    ]).
     monad:bind(
       Monad,F(pre, XNode),
