@@ -24,8 +24,28 @@
 %% in guards where only a limited number of expressions are allowed.
 %% N.B. if this module is to be used as a basis for transforms then
 %% all the error cases must be handled otherwise this module just crashes!
+-export([traverse/3, map_reduce/3]).
+-export([map_with_state/3, map/2, reduce/3]).
+-export([read/1, attributes/2]).
 
--export([read/1, attributes/2, map_reduce/3, traverse/2, traverse/3]).
+-spec traverse(M, fun((_Type, Node) -> monad:monadic(M, Node)), Form) -> monad:monadic(M, Form) when M :: monad:monad().
+traverse(Monad, F, Forms) ->
+    do_traverse(Monad, F, Forms, forms).
+
+-spec map_reduce(fun((_Type, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
+map_reduce(F, Init, Forms) ->
+    STNode = traverse(erlando_ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
+    erlando_ast_state:run(STNode, Init).
+
+map_with_state(F, Init, Forms) ->
+    {NForms, _State} = map_reduce(F, Init, Forms),
+    NForms.
+
+map(F, Forms) ->
+    map_with_state(fun(Type, Node, State) -> {F(Type, Node), State} end, ok, Forms).
+
+reduce(F, Init, Forms) ->
+    map_reduce(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, Forms).
 
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
 read(Module) when is_atom(Module) ->
@@ -54,19 +74,6 @@ attributes(Attribute, Forms) ->
          (_Other, Acc) ->
               Acc
       end, [], Forms).
-
--spec map_reduce(fun((_Type, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
-map_reduce(F, Init, Forms) ->
-    STNode = traverse(erlando_ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
-    erlando_ast_state:run(STNode, Init).
-
--spec traverse(fun((Node, _Type) -> Node), Form) -> Form.
-traverse(F, Forms) ->
-    traverse(identity_m, F, Forms).
-
--spec traverse(M, fun((_Type, Node) -> monad:monadic(M, Node)), Form) -> monad:monadic(M, Form) when M :: monad:monad().
-traverse(Monad, F, Forms) ->
-    do_traverse(Monad, F, Forms, forms).
 
 %%%===================================================================
 %%% Internal functions
