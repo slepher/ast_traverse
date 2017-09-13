@@ -16,7 +16,7 @@
 %% 
 %%     $Id$
 %%
--module(erlando_ast).
+-module(ast_traverse).
 
 %% An identity transformer of Erlang abstract syntax.
 
@@ -34,8 +34,8 @@ traverse(Monad, F, Forms) ->
 
 -spec map_reduce(fun((_Type, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
 map_reduce(F, Init, Forms) ->
-    STNode = traverse(erlando_ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
-    erlando_ast_state:run(STNode, Init).
+    STNode = traverse(ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
+    ast_state:run(STNode, Init).
 
 map_with_state(F, Init, Forms) ->
     {NForms, _State} = map_reduce(F, Init, Forms),
@@ -83,10 +83,10 @@ do_traverse(Monad, F, XNode, NodeType) ->
     %% do form
     %% do([Monad ||
     %%           YNode <- F(pre, XNode),
-    %%           ZNode <- fold_children(Monad, F, YNode, erlando_ast_lens:node_lens(XNodeType, YNode)),
+    %%           ZNode <- fold_children(Monad, F, YNode, ast_lens:node_lens(XNodeType, YNode)),
     %%           F(post, ZNode)
     %%    ]).
-    monad_bind(
+    ast_lens:bind(
       Monad,
       F(pre, XNode),
       fun(YNode) ->
@@ -100,17 +100,17 @@ do_traverse(Monad, F, XNode, NodeType) ->
       end).
 
 fold_children(Monad, F, Node, NodeType) ->
-    ChildrenLens = erlando_ast_lens:children_lens(NodeType, Node),
+    ChildrenLens = ast_lens:children_lens(NodeType, Node),
     lists:foldl( 
       fun({ChildNodeType, ChildLens}, MNode) ->
               monad_bind(
                 Monad, MNode,
                 fun(NodeAcc) ->
-                        (erlando_ast_lens:modify(Monad, ChildLens, 
+                        (ast_lens:modify(Monad, ChildLens, 
                                          fun(Child) ->
                                                  do_traverse(Monad, F, Child, ChildNodeType)
                                          end))(NodeAcc)
-                          end)
+                end)
       end, monad:return(Monad, Node), ChildrenLens).
 
 %% same as monad:bind/3

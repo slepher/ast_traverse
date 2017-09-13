@@ -6,9 +6,10 @@
 %%% @end
 %%% Created : 30 Aug 2017 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
--module(erlando_ast_lens).
+-module(ast_lens).
 
 %% API
+-export([lift_m/3, bind/3, return/2]).
 -export([modify/3, children_lens/2]).
 -export([forms/1, form/1, farity_list/1, farity/1]).
 -export([variable_list/1, variable/1]).
@@ -24,12 +25,26 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
-forms(Forms) when is_list(Forms) ->
-    children(forms, form, Forms).
+lift_m(Monad, F, X) ->
+    bind(Monad, X,
+         fun(A) ->
+                 return(Monad, F(A))
+         end).
+
+%% same as monad:bind/3
+bind({T, _IM} = M, X, F) ->
+    T:'>>='(X, F, M);
+bind(M, X, F) ->
+    M:'>>='(X, F).
+
+return({T, _IM} = M, A) ->
+    T:return(A, M);
+return(M, A) ->
+    M:return(A).
 
 modify(Monad, {Get, Put} = _Lens, F) ->
     fun(X) ->
-            monad:lift_m(Monad, fun(Y) -> Put(Y, X) end, F(Get(X)))
+            lift_m(Monad, fun(Y) -> Put(Y, X) end, F(Get(X)))
     end.
 %%--------------------------------------------------------------------
 %% @doc
@@ -40,6 +55,7 @@ modify(Monad, {Get, Put} = _Lens, F) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
 lens_r(N) ->
     {fun(R) -> element(N, R) end,
      fun(A, R) -> setelement(N, R, A) end}.
@@ -76,6 +92,9 @@ children(Type, ChildType, [_H|_T]) ->
 
 children_lens(Type, Node) ->
     erlando_ast_lens:Type(Node).
+
+forms(Forms) when is_list(Forms) ->
+    children(forms, form, Forms).
 
 %% -type form(Form) -> Form.
 %%  Here we show every known form and valid internal structure. We do not
