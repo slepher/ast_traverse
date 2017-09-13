@@ -74,7 +74,7 @@ children(Type, ChildType, [_H|_T]) ->
 %% forms(Fs) -> lists:map((F) -> form(F) end, Fs).
 
 children_lens(Type, Node) ->
-    erlando_ast_lens:Type(Node).
+    ?MODULE:Type(Node).
 
 forms(Forms) when is_list(Forms) ->
     children(forms, form, Forms).
