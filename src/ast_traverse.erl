@@ -10,20 +10,15 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %% 
-%% The Initial Developer of the Original Code is Ericsson Utvecklings AB.
-%% Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
-%% AB. All Rights Reserved.''
-%% 
-%%     $Id$
-%%
+%%%-------------------------------------------------------------------
+%%% @author Chen Slepher <slepheric@gmail.com>
+%%% @copyright (C) 2017, Chen Slepher
+%%% @doc
+%%%
+%%% @end
+%%% Created : 30 Aug 2017 by Chen Slepher <slepheric@gmail.com>
+%%%-------------------------------------------------------------------
 -module(ast_traverse).
-
-%% An identity transformer of Erlang abstract syntax.
-
-%% This module only traverses legal Erlang code. This is most noticeable
-%% in guards where only a limited number of expressions are allowed.
-%% N.B. if this module is to be used as a basis for transforms then
-%% all the error cases must be handled otherwise this module just crashes!
 -export([traverse/3, map_reduce/3]).
 -export([map_with_state/3, map/2, reduce/3]).
 -export([read/1, attributes/2]).
