@@ -1,0 +1,6 @@
+{application, ast_traverse,
+ [{description, "Erlang AST traverse"},
+  {vsn, "%%VSN%%"},
+  {modules, []},
+  {registered, []},
+  {applications, [kernel, stdlib, sasl]}]}.

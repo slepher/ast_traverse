@@ -9,7 +9,6 @@
 -module(ast_lens).
 
 %% API
--export([lift_m/3, bind/3, return/2]).
 -export([modify/3, children_lens/2]).
 -export([forms/1, form/1, farity_list/1, farity/1]).
 -export([variable_list/1, variable/1]).
@@ -25,26 +24,10 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
-lift_m(Monad, F, X) ->
-    bind(Monad, X,
-         fun(A) ->
-                 return(Monad, F(A))
-         end).
-
-%% same as monad:bind/3
-bind({T, _IM} = M, X, F) ->
-    T:'>>='(X, F, M);
-bind(M, X, F) ->
-    M:'>>='(X, F).
-
-return({T, _IM} = M, A) ->
-    T:return(A, M);
-return(M, A) ->
-    M:return(A).
 
 modify(Monad, {Get, Put} = _Lens, F) ->
     fun(X) ->
-            lift_m(Monad, fun(Y) -> Put(Y, X) end, F(Get(X)))
+            ast_monad:lift_m(Monad, fun(Y) -> Put(Y, X) end, F(Get(X)))
     end.
 %%--------------------------------------------------------------------
 %% @doc

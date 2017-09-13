@@ -86,11 +86,11 @@ do_traverse(Monad, F, XNode, NodeType) ->
     %%           ZNode <- fold_children(Monad, F, YNode, ast_lens:node_lens(XNodeType, YNode)),
     %%           F(post, ZNode)
     %%    ]).
-    ast_lens:bind(
+    ast_monad:bind(
       Monad,
       F(pre, XNode),
       fun(YNode) ->
-              monad_bind(
+              ast_monad:bind(
                 Monad,
                 %% type of y node should be same as type of x node
                 fold_children(Monad, F, YNode, NodeType),
@@ -103,7 +103,7 @@ fold_children(Monad, F, Node, NodeType) ->
     ChildrenLens = ast_lens:children_lens(NodeType, Node),
     lists:foldl( 
       fun({ChildNodeType, ChildLens}, MNode) ->
-              monad_bind(
+              ast_monad:bind(
                 Monad, MNode,
                 fun(NodeAcc) ->
                         (ast_lens:modify(Monad, ChildLens, 
@@ -111,11 +111,4 @@ fold_children(Monad, F, Node, NodeType) ->
                                                  do_traverse(Monad, F, Child, ChildNodeType)
                                          end))(NodeAcc)
                 end)
-      end, monad:return(Monad, Node), ChildrenLens).
-
-%% same as monad:bind/3
-monad_bind({MonadT, InnerM}, F, X) ->
-    MonadT:'>>='(F, X, InnerM);
-monad_bind(Monad, F, X) ->
-    Monad:'>>='(F, X).
-
+      end, ast_monad:return(Monad, Node), ChildrenLens).
