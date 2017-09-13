@@ -37,15 +37,19 @@ map_reduce(F, Init, Forms) ->
     STNode = traverse(ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
     ast_state:run(STNode, Init).
 
+-spec map_with_state(fun((_Type, Node, State) -> {Node, State}), State, Forms) -> Forms.
 map_with_state(F, Init, Forms) ->
     {NForms, _State} = map_reduce(F, Init, Forms),
     NForms.
 
+-spec map(fun((_Type, Node) -> Node), Forms) -> Forms.
 map(F, Forms) ->
     map_with_state(fun(Type, Node, State) -> {F(Type, Node), State} end, ok, Forms).
 
+-spec reduce(fun((_Type, _Node, State) -> State), State, _Forms) -> State.
 reduce(F, Init, Forms) ->
-    map_reduce(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, Forms).
+    {_NForms, NState} = map_reduce(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, Forms),
+    NState.
 
 %% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
