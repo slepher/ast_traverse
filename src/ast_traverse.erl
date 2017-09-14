@@ -23,27 +23,28 @@
 -export([map_with_state/3, map/2, reduce/3]).
 -export([read/1, attributes/2]).
 
--spec traverse(M, fun((_Type, Node) -> monad:monadic(M, Node)), Form) -> monad:monadic(M, Form) when M :: monad:monad().
+-spec traverse(M, fun((_Type, _NodeType, Node) -> monad:monadic(M, Node)), Form) ->
+                      monad:monadic(M, Form) when M :: monad:monad().
 traverse(Monad, F, Forms) ->
     do_traverse(Monad, F, Forms, forms).
 
--spec map_reduce(fun((_Type, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
+-spec map_reduce(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
 map_reduce(F, Init, Forms) ->
-    STNode = traverse(ast_state, fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, Forms),
+    STNode = traverse(ast_state, fun(Type, NodeType, Node) -> fun(State) -> F(Type, NodeType, Node, State) end end, Forms),
     ast_state:run(STNode, Init).
 
--spec map_with_state(fun((_Type, Node, State) -> {Node, State}), State, Forms) -> Forms.
+-spec map_with_state(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Forms) -> Forms.
 map_with_state(F, Init, Forms) ->
     {NForms, _State} = map_reduce(F, Init, Forms),
     NForms.
 
--spec map(fun((_Type, Node) -> Node), Forms) -> Forms.
+-spec map(fun((_Type, _NodeType, Node) -> Node), Forms) -> Forms.
 map(F, Forms) ->
-    map_with_state(fun(Type, Node, State) -> {F(Type, Node), State} end, ok, Forms).
+    map_with_state(fun(Type, NodeType, Node, State) -> {F(Type, NodeType, Node), State} end, ok, Forms).
 
--spec reduce(fun((_Type, _Node, State) -> State), State, _Forms) -> State.
+-spec reduce(fun((_Type, _NodeType, _Node, State) -> State), State, _Forms) -> State.
 reduce(F, Init, Forms) ->
-    {_NForms, NState} = map_reduce(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, Forms),
+    {_NForms, NState} = map_reduce(fun(Type, NodeType, Node, State) -> {Node, F(Type, NodeType, Node, State)} end, Init, Forms),
     NState.
 
 %% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
@@ -87,14 +88,14 @@ do_traverse(Monad, F, XNode, NodeType) ->
     %%    ]).
     ast_monad:bind(
       Monad,
-      F(pre, XNode),
+      F(pre, NodeType, XNode),
       fun(YNode) ->
               ast_monad:bind(
                 Monad,
                 %% type of y node should be same as type of x node
                 fold_children(Monad, F, YNode, NodeType),
                 fun(ZNode) ->
-                        F(post, ZNode)
+                        F(post, NodeType, ZNode)
                 end)
       end).
 
