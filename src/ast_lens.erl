@@ -24,11 +24,13 @@
 -export([guards/1, guard/1, guard_test/1]).
 -export([guard_bin_elements/1, guard_bin_element/1]).
 -export([guard_test_associations/1, guard_test_association/1]).
+-export([guard_test_call_remote/1]).
 -export([guard_test_record_fields/1, guard_test_record_field/1]).
 %% exprs
 -export([expr_list/1, exprs/1, expr/1]).
 -export([expr_bin_elements/1, expr_bin_element/1]).
 -export([expr_associations/1, expr_association/1]).
+-export([expr_call_remote/1]).
 -export([record_inits/1, record_init/1, record_updates/1, record_update/1]).
 -export([fun_clauses/1, fun_clause/1]).
 -export([case_clauses/1, case_clause/1, if_clauses/1, if_clause/1]).
@@ -317,7 +319,7 @@ pattern({op,_Line,_Op,_A}) ->
 %% If P is a record field index pattern #Name.Field
 %% where Field is an atom, then Rep(P) = {record_index,LINE,Name,Rep(Field)}.
 pattern({record_index,_Line,_Name,{atom, _Line, _Field}}) ->
-    [];
+    [{pattern, lens_r(4)}];
 
 %% If P is a record pattern #Name{PF_1, ..., PF_k}
 %% then Rep(P) = {record,LINE,Name,[Rep(PF_1), ..., Rep(PF_k)]}.
@@ -403,7 +405,7 @@ guard_test({cons,_Line,_H0,_T0}) ->
 guard_test({call,_Line,{atom,_La,F},As0}) ->
     case erl_internal:guard_bif(F, length(As0)) of
 	true -> 
-            [{guard, lens_r(4)}]
+            [{guard_test, lens_r(3)}, {guard, lens_r(4)}]
     end;
 
 %% If Gt is a function call A_m:A(Gt_1, ..., Gt_k)
@@ -416,7 +418,7 @@ guard_test({call,_Line,{remote,_La,{atom,_Lb,erlang},{atom,_Lc,F}},As0}) ->
         erl_internal:comp_op(F, length(As0)) or
         erl_internal:bool_op(F, length(As0)) of
 	true -> 
-            [{guard, lens_r(4)}]
+            [{guard_test_call_remote, lens_r(3)}, {guard, lens_r(4)}]
     end;
 
 %% If Gt is a map creation #{A_1, ..., A_k}
@@ -469,12 +471,12 @@ guard_test({record,_Line,_Name,_Inits0}) ->
 %% where Field is an atom
 %% then Rep(Gt) = {record_field,LINE,Rep(Gt_0),Name,Rep(Field)}.
 guard_test({record_field,_Line0,_Rec0,_Name,{atom,_Line1,_Field0}}) ->
-    [{guard_test, lens_r(3)}];
+    [{guard_test, lens_r(3)}, {guard_test, lens_r(5)}];
 %% If Gt is a record field index #Name.Field
 %% where Field is an atom
 %% then Rep(Gt) = {record_index,LINE,Name,Rep(Field)}.
 guard_test({record_index,_Line0,_Name,{atom,_Line1,_Field0}}) ->
-    [];
+    [{guard_test, lens_r(5)}];
 %% If Gt is a tuple skeleton {Gt_1, ..., Gt_k}
 %% then Rep(Gt) = {tuple,LINE,[Rep(Gt_1), ..., Rep(Gt_k)]}.
 guard_test({tuple,_Line,_Es0}) ->
@@ -498,6 +500,9 @@ guard_test_associations(Associations) ->
 
 guard_test_association(Association) ->
     association(guard_test, Association).
+
+guard_test_call_remote({remote,_Line2,_M0,_F0}) ->
+    [{guard_test, lens_r(3)}, {guard_test, lens_r(4)}].
 
 %% -type guard([GuardExpr]) -> [GuardExpr].
 %%  These expressions are processed "in parallel" for purposes of variable
@@ -571,7 +576,7 @@ expr({named_fun,_Loc,_Name,_Cs}) ->
 %% If E is a function call E_m:E_0(E_1, ..., E_k)
 %% then Rep(E) = {call,LINE,{remote,LINE,Rep(E_m),Rep(E_0)},[Rep(E_1), ..., Rep(E_k)]}.
 expr({call,_Line1, {remote,_Line2,_M0,_F0}, _As0}) ->
-    [{expr, c(lens_r(3), lens_r(3))}, {expr, c(lens_r(3), lens_r(4))}, {exprs, lens_r(4)}];
+    [{expr_call_remote, lens_r(3)}, {exprs, lens_r(4)}];
 
 %% If E is a function call E_0(E_1, ..., E_k)
 %% then Rep(E) = {call,LINE,Rep(E_0),[Rep(E_1), ..., Rep(E_k)]}.
@@ -645,13 +650,13 @@ expr({record,_Line,_Name,_Inits0}) ->
 %% where Field is an atom
 %% then Rep(E) = {record_field,LINE,Rep(E_0),Name,Rep(Field)}.
 expr({record_field,_Line,_Rec0,_Name,{atom, _Line1, _Field}}) ->
-    [{expr, lens_r(3)}];
+    [{expr, lens_r(3)}, {expr, lens_r(5)}];
 
 %% If E is a record field index #Name.Field
 %% where Field is an atom
 %% then Rep(E) = {record_index,LINE,Name,Rep(Field)}.
 expr({record_index,_Line,_Name,{atom, _Line1, _Field}}) ->
-    [];
+    [{expr, lens_r(4)}];
 
 %% If E is a record update E_0#Name{Field_1=E_1, ..., Field_k=E_k}
 %% where each Field_i is an atom
@@ -707,6 +712,9 @@ expr_associations(Associations) ->
 expr_association(Association) ->
     association(expr, Association).
 
+expr_call_remote({remote,_Line2,_M0,_F0}) ->
+    [{expr, lens_r(3)}, {expr, lens_r(4)}].
+
 %% If FB is a fun expression Name/Arity
 %% then Rep(FB) = {function,Name,Arity}.
 function_body({function,_F,_A}) ->
@@ -748,7 +756,7 @@ record_updates(Updates) when is_list(Updates) ->
     children(record_updates, record_update, Updates).
 
 record_update({record_field,_Lf,{atom,_La,_F},_Val0}) ->
-    [{expr, lens_r(4)}].
+    [{expr, lens_r(3)}, {expr, lens_r(4)}].
 
 catch_clauses(Clauses) when is_list(Clauses) ->
     children(catch_clauses, catch_clause, Clauses).
@@ -807,13 +815,19 @@ lc_bc_qual(_Quals) ->
 function_types(List) when is_list(List) ->
     children(function_types, function_type, List).
 
+%% If Ft is a constrained function type Ft_1 when Fc,
+%% where Ft_1 is a function type and Fc is a function constraint, 
+%% then Rep(T) = {type,LINE,bounded_fun,[Rep(Ft_1),Rep(Fc)]}. For Rep(Fc), see below.
+
 function_type({type,_Line,bounded_fun,[_Ft,_Fc]}) ->
     [{Type, c(lens_r(4), lens_l(N))} || {Type, N} <- [{function_type, 1}, {function_constraint, 2}]];
 function_type(Ft) ->
     function_type1(Ft).
 
+%% If Ft is a function type (T_1, ..., T_n) -> T_0, where each T_i is a type
+%% then Rep(Ft) = {type,LINE,'fun',[{type,LINE,product,[Rep(T_1), ..., Rep(T_n)]},Rep(T_0)]}.
 function_type1({type,_Line,'fun',[{type,_Lt,product,_As},_B]}) ->
-    [{types, c(lens_r(4), c(lens_l(1), lens_r(4)))}, {type, c(lens_r(4), lens_l(2))}].
+    [{type, c(lens_r(4), lens_l(1))}, {type, c(lens_r(4), lens_l(2))}].
 
 function_constraint(Constraints) when is_list(Constraints) ->
     children(function_constraint, constraint, Constraints).
@@ -822,13 +836,13 @@ function_constraint(Constraints) when is_list(Constraints) ->
 %% where V is a type variable and T is a type
 %% then Rep(C) = {type,LINE,constraint,[{atom,LINE,is_subtype},[Rep(V),Rep(T)]]}.
 constraint({type,_Line, constraint,[{atom,_L,_A},[_V,_T]]}) ->
-    [{type, c(lens_r(4), c(lens_l(2), lens_l(N)))} || N <- [1, 2]].
+    [{type, c(lens_r(4), lens_l(1))}|[{type, c(lens_r(4), c(lens_l(2), lens_l(N)))} || N <- [1, 2]]].
 
 %% If T is an annotated type A :: T_0
 %% where A is a variable
 %% then Rep(T) = {ann_type,LINE,[Rep(A),Rep(T_0)]}.
 type({ann_type,_Line,[{var,_Lv,_V},_T]}) ->
-    [{type, c(lens_r(3), lens_l(2))}];
+    [{type, c(lens_r(3), lens_l(L))} || L <- [1,2]];
 
 %% If T is an atom or integer literal L
 %% then Rep(T) = Rep(L).
@@ -853,7 +867,10 @@ type({type,_Line,'fun',[]}) ->
 %% If T is a fun type fun((...) -> T_0)
 %% then Rep(T) = {type,LINE,'fun',[{type,LINE,any},Rep(T_0)]}.
 type({type,_Line,'fun',[{type,_Lt,any},_B]}) ->
-    [{type, c(lens_r(4), lens_l(2))}];
+    [{type, c(lens_r(4), lens_l(L))} || L <- [1,2]];
+
+type({type,_Line, any}) ->
+    [];
 
 %% If T is a fun type fun(Ft)
 %% where Ft is a function type, then Rep(T) = Rep(Ft). For Rep(Ft), see below.
@@ -861,6 +878,9 @@ type({type,_Line,bounded_fun,_As} = Type) ->
     function_type(Type);
 type({type,_Line,'fun',[{type,_Line1,product,_As}, _B]} = Type) ->
     function_type(Type);
+
+type({type,_Line,product,_As}) ->
+    [{types, lens_r(4)}];
 
 %% If T is an integer range type L .. H
 %% where L and H are singleton integer types
@@ -898,12 +918,12 @@ type({op,_Line,_Op,_T}) ->
 %% then Rep(T) = {type,LINE,record,[Rep(Name),Rep(F_1), ..., Rep(F_k)]}
 %% For Rep(F), see below.
 type({type,_Line,record,[{atom,_La,_N}|_Fs]}) ->
-    [{field_types, c(lens_r(4), lens_lt())}];
+    [{type, c(lens_r(4), lens_lh())}, {field_types, c(lens_r(4), lens_lt())}];
 
 %% If T is a remote type M:N(T_1, ..., T_k)
 %% then Rep(T) = {remote_type,LINE,[Rep(M),Rep(N),[Rep(T_1), ..., Rep(T_k)]]}.
 type({remote_type,_Line,[{atom,_Lm,_M},{atom,_Ln,_N},_As]}) ->
-    [{types, c(lens_r(3), lens_l(3))}];
+    [{Type, c(lens_r(3), lens_l(L))} || {Type, L} <- [{type, 1}, {type,2}, {types,3}]];
 
 %% If T is a tuple type tuple()
 %% then Rep(T) = {type,LINE,tuple,any}.
@@ -958,7 +978,7 @@ field_types(Types) when is_list(Types) ->
 %% where Type is a type
 %% then Rep(F) = {type,LINE,field_type,[Rep(Name),Rep(Type)]}.
 field_type({type,_Line,field_type,[{atom,_La,_A},_T]}) ->
-    [{type, c(lens_r(4), lens_l(2))}].
+    [{type, c(lens_r(4), lens_l(L))} || L <- [1,2]].
 
 types(Types) when is_list(Types) ->
     children(types, type, Types).
@@ -1017,6 +1037,6 @@ association(SubType, {map_field_exact,_Line,_K,_V}) ->
 %% while sub_type is expr, Rep(ST) = Rep(E)
 %% where Rep(Field) is an atom or _,
 record_field(Type, {record_field,_Lf,{atom,_La,_F},_P0}) ->
-    [{Type, lens_r(4)}];
+    [{Type, lens_r(3)}, {Type, lens_r(4)}];
 record_field(Type, {record_field,_Lf,{var,_La,'_'},_P0}) ->
-    [{Type, lens_r(4)}].
+    [{Type, lens_r(3)}, {Type, lens_r(4)}].
