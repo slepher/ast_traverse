@@ -761,7 +761,7 @@ catch_clause(Clause) ->
 case_clauses(Clauses) when is_list(Clauses) ->
     children(case_clauses, case_clause, Clauses).
 
-case_clause(Clause) when is_list(Clause) ->
+case_clause(Clause) ->
     clause(Clause).
 
 if_clauses(Clauses) when is_list(Clauses) ->

@@ -19,33 +19,32 @@
 %%% Created : 30 Aug 2017 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
 -module(ast_traverse).
--export([traverse/3, map_reduce/3]).
 -export([map_with_state/3, map/2, reduce/3]).
+-export([map_reduce/3, map_m/3]).
+-export([map_with_state/4, map/3, reduce/4]).
+-export([map_reduce/4, map_m/4]).
 -export([read/1, attributes/2]).
-
--spec traverse(M, fun((_Type, _NodeType, Node) -> monad:monadic(M, Node)), Form) ->
-                      monad:monadic(M, Form) when M :: monad:monad().
-traverse(Monad, F, Forms) ->
-    do_traverse(Monad, F, Forms, forms).
-
--spec map_reduce(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Form) -> {Form, State}.
-map_reduce(F, Init, Forms) ->
-    STNode = traverse(ast_state, fun(Type, NodeType, Node) -> fun(State) -> F(Type, NodeType, Node, State) end end, Forms),
-    ast_state:run(STNode, Init).
 
 -spec map_with_state(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Forms) -> Forms.
 map_with_state(F, Init, Forms) ->
-    {NForms, _State} = map_reduce(F, Init, Forms),
-    NForms.
+    map_with_state(F, Init, Forms, forms).
 
 -spec map(fun((_Type, _NodeType, Node) -> Node), Forms) -> Forms.
 map(F, Forms) ->
-    map_with_state(fun(Type, NodeType, Node, State) -> {F(Type, NodeType, Node), State} end, ok, Forms).
+    map(F, Forms, forms).
 
 -spec reduce(fun((_Type, _NodeType, _Node, State) -> State), State, _Forms) -> State.
 reduce(F, Init, Forms) ->
-    {_NForms, NState} = map_reduce(fun(Type, NodeType, Node, State) -> {Node, F(Type, NodeType, Node, State)} end, Init, Forms),
-    NState.
+    reduce(F, Init, Forms, forms).
+
+-spec map_reduce(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Ast) -> {Ast, State}.
+map_reduce(F, Init, Forms) ->
+    map_reduce(F, Init, Forms, forms).
+
+-spec map_m(M, fun((_Type, _NodeType, Node) -> ast_monad:monadic(M, Node)), Ast) ->
+                   ast_monad:monadic(M, Ast) when M :: ast_monad:monad().
+map_m(Monad, F, Forms) ->
+    map_m(Monad, F, Forms, forms).
 
 %% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
@@ -68,6 +67,7 @@ read(File) ->
             throw({file_not_found, File})
     end.
 
+-spec attributes(atom(), _Forms) -> [_Attribute].
 attributes(Attribute, Forms) ->
     lists:foldl(
       fun({attribute, _Line, Attr, Values}, Acc) when Attr == Attribute ->
@@ -76,10 +76,30 @@ attributes(Attribute, Forms) ->
               Acc
       end, [], Forms).
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-do_traverse(Monad, F, XNode, NodeType) ->
+-spec map_with_state(fun((_Type, NodeType, Node, State) -> {Node, State}), State, Node, NodeType) -> Node.
+map_with_state(F, Init, Forms, TopNodeType) ->
+    {NForms, _State} = map_reduce(F, Init, Forms, TopNodeType),
+    NForms.
+
+-spec map(fun((_Type, NodeType, Node) -> Node), Node, NodeType) -> Node.
+map(F, TopNode, TopNodeType) ->
+    map_with_state(fun(Type, NodeType, Node, State) -> {F(Type, NodeType, Node), State} end, ok, TopNode, TopNodeType).
+
+-spec reduce(fun((_Type, NodeType, Node, State) -> State), State, Node, NodeType) -> State.
+reduce(F, Init, TopNode, TopNodeType) ->
+    {_NForms, NState} = 
+        map_reduce(fun(Type, NodeType, Node, State) -> {Node, F(Type, NodeType, Node, State)} end, Init, TopNode, TopNodeType),
+    NState.
+
+-spec map_reduce(fun((_Type, NodeType, Node, State) -> {Node, State}), State, Node, NodeType) -> {Node, State}.
+map_reduce(F, Init, TopNode, TopNodeType) ->
+    STNode = map_m(ast_state, 
+                   fun(Type, NodeType, Node) -> fun(State) -> F(Type, NodeType, Node, State) end end, TopNode, TopNodeType),
+    ast_state:run(STNode, Init).
+
+-spec map_m(M, fun((_Type, NodeType, Node) -> ast_monad:monadic(M, Node)), Node, NodeType) -> 
+                   ast_monad:monadic(M, Node) when M :: ast_monad:monad().
+map_m(Monad, F, XNode, NodeType) ->
     %% do form
     %% do([Monad ||
     %%           YNode <- F(pre, XNode),
@@ -99,6 +119,10 @@ do_traverse(Monad, F, XNode, NodeType) ->
                 end)
       end).
 
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
 fold_children(Monad, F, Node, NodeType) ->
     ChildrenLens = ast_lens:children_lens(NodeType, Node),
     lists:foldl( 
@@ -108,7 +132,7 @@ fold_children(Monad, F, Node, NodeType) ->
                 fun(NodeAcc) ->
                         (ast_lens:modify(Monad, ChildLens, 
                                          fun(Child) ->
-                                                 do_traverse(Monad, F, Child, ChildNodeType)
+                                                 map_m(Monad, F, Child, ChildNodeType)
                                          end))(NodeAcc)
                 end)
       end, ast_monad:return(Monad, Node), ChildrenLens).

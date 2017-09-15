@@ -8,8 +8,13 @@
 %%%-------------------------------------------------------------------
 -module(ast_monad).
 
+-export_type([monad/0, monadic/2]).
+
 %% API
 -export([lift_m/3, bind/3, return/2]).
+
+-type monad()         :: module() | {module(), monad()}.
+-type monadic(_M, _A) :: any().
 
 %%%===================================================================
 %%% API
