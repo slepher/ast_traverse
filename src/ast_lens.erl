@@ -14,7 +14,7 @@
 -export([forms/1, form/1]).
 -export([farities/1, farity/1, variables/1, variable/1]).
 -export([record_defs/1, record_def/1, record_field_def/1]).
-%% clauses -> {patterns, guards, exprs}
+%% clauses -> {patterns, guards, expressions}
 %% patterns
 -export([patterns/1, pattern/1]).
 -export([pattern_bin_elements/1, pattern_bin_element/1]).
@@ -26,11 +26,11 @@
 -export([guard_test_associations/1, guard_test_association/1]).
 -export([guard_test_call_remote/1]).
 -export([guard_test_record_fields/1, guard_test_record_field/1]).
-%% exprs
--export([expr_list/1, exprs/1, expr/1]).
--export([expr_bin_elements/1, expr_bin_element/1]).
--export([expr_associations/1, expr_association/1]).
--export([expr_call_remote/1]).
+%% expressions
+-export([expressions/1, expression/1]).
+-export([expression_bin_elements/1, expression_bin_element/1]).
+-export([expression_associations/1, expression_association/1]).
+-export([expression_call_remote/1]).
 -export([record_inits/1, record_init/1, record_updates/1, record_update/1]).
 -export([fun_clauses/1, fun_clause/1]).
 -export([case_clauses/1, case_clause/1, if_clauses/1, if_clause/1]).
@@ -233,7 +233,7 @@ record_field_def({record_field,_Line,{atom,_La,_A}}) ->
     [];
 %% If VF is A = E, where E is an expression, then Rep(VF) = {record_field,LINE,Rep(A),Rep(E)}.
 record_field_def({record_field,_Line, {atom,_La,_A},_Val0}) ->
-    [{expr, lens_r(4)}].
+    [{expression, lens_r(4)}].
 
 
 %% -type variables([Var]) -> [Var]
@@ -247,7 +247,7 @@ variable({var, _Line, _Var}) ->
 %% -type clause(Clause) -> Clause.
 
 clause({clause,_Line,_H0,_G0,_B0}) ->
-    [{patterns, lens_r(3)}, {guards, lens_r(4)}, {exprs, lens_r(5)}].
+    [{patterns, lens_r(3)}, {guards, lens_r(4)}, {expressions, lens_r(5)}].
 
 %% -type patterns([Pattern]) -> [Pattern].
 %%  These patterns are processed "sequentially" for purposes of variable
@@ -308,13 +308,13 @@ pattern({nil,_Line}) -> [];
 %% or an occurrence of an expression that can be evaluated to a number at compile time)
 %% then Rep(P) = {op,LINE,Op,Rep(P_1),Rep(P_2)}.
 pattern({op,_Line,_Op,_L,_R}) ->
-    [{expr, lens_r(4)}, {pattern, lens_r(5)}];
+    [{expression, lens_r(4)}, {pattern, lens_r(5)}];
 
 %% If P is an operator pattern Op P_0
 %% where Op is a unary operator (this is an occurrence of an expression that can be evaluated to a number at compile time)
 %% then Rep(P) = {op,LINE,Op,Rep(P_0)}.
 pattern({op,_Line,_Op,_A}) ->
-    [{expr, lens_r(4)}];
+    [{expression, lens_r(4)}];
 
 %% If P is a record field index pattern #Name.Field
 %% where Field is an atom, then Rep(P) = {record_index,LINE,Name,Rep(Field)}.
@@ -380,7 +380,7 @@ guard(Guard) when is_list(Guard) ->
 %% Before R9, there were special rules regarding the expressions on
 %% top level in guards. Those limitations are now lifted - therefore
 %% there is no need for a special clause for the toplevel expressions.
-%% -type guard_test(GuardExpr) -> GuardExpr.
+%% -type guard_test(GuardExpression) -> GuardExpression.
 
 %% If Gt is an atomic literal L, then Rep(Gt) = Rep(L).
 guard_test({integer,_Line,_I}) -> [];
@@ -504,7 +504,7 @@ guard_test_association(Association) ->
 guard_test_call_remote({remote,_Line2,_M0,_F0}) ->
     [{guard_test, lens_r(3)}, {guard_test, lens_r(4)}].
 
-%% -type guard([GuardExpr]) -> [GuardExpr].
+%% -type guard([GuardExpression]) -> [GuardExpression].
 %%  These expressions are processed "in parallel" for purposes of variable
 %%  definition etc.
 
@@ -514,160 +514,161 @@ guard_test_record_fields(Inits) when is_list(Inits) ->
 guard_test_record_field(Field) ->
     record_field(guard_test, Field).
 
-%% -type exprs([Expression]) -> [Expression].
+%% -type expressions([Expression]) -> [Expression].
 %%  These expressions are processed "sequentially" for purposes of variable
 %%  definition etc.
 
-exprs(Exprs) when is_list(Exprs) ->
-    children(exprs, expr, Exprs).
-%% -type expr(Expression) -> Expression.
+expressions(Expressions) when is_list(Expressions) ->
+    children(expressions, expression, Expressions).
+
+%% -type expression(Expression) -> Expression.
 
 %% If E is an atomic literal L, then Rep(E) = Rep(L).
-expr({integer,_Line,_I}) -> [];
-expr({float,_Line,_F}) -> [];
-expr({atom,_Line,_A}) -> [];
-expr({string,_Line,_S}) -> [];
-expr({char,_Line,_C}) -> [];
+expression({integer,_Line,_I}) -> [];
+expression({float,_Line,_F}) -> [];
+expression({atom,_Line,_A}) -> [];
+expression({string,_Line,_S}) -> [];
+expression({char,_Line,_C}) -> [];
 
 %% If E is a bitstring comprehension <<E_0 || Q_1, ..., Q_k>>
 %% where each Q_i is a qualifier
 %% then Rep(E) = {bc,LINE,Rep(E_0),[Rep(Q_1), ..., Rep(Q_k)]}. For Rep(Q), see below.
-expr({bc,_Line,_E0,_Qs0}) ->
-    [{expr, lens_r(3)}, {lc_bc_quals, lens_r(4)}];
+expression({bc,_Line,_E0,_Qs0}) ->
+    [{expression, lens_r(3)}, {lc_bc_quals, lens_r(4)}];
 
 %% If E is a bitstring constructor <<EBE_1, ..., EBE_k>>
 %% then Rep(E) = {bin,LINE, [Rep(EBE_1), ..., Rep(EBE_k)]}. 
 %% For Rep(EBE), see below.
-expr({bin,_Line,_Fs}) ->
-    [{expr_bin_elements, lens_r(3)}];
+expression({bin,_Line,_Fs}) ->
+    [{expression_bin_elements, lens_r(3)}];
 %% If E is a block expression begin B end, where B is a body
 %% then Rep(E) = {block,LINE,Rep(B)}.
-expr({block,_Line,_Es}) ->
-    [{exprs, lens_r(3)}];
+expression({block,_Line,_Es}) ->
+    [{expressions, lens_r(3)}];
 
 %% If E is a case expression case E_0 of Cc_1 ; ... ; Cc_k end
 %% where E_0 is an expression and each Cc_i is a case clause
 %% then Rep(E) = {'case',LINE,Rep(E_0),[Rep(Cc_1), ..., Rep(Cc_k)]}.
-expr({'case',_Line,_E0,_Cs0}) ->
-    [{expr, lens_r(3)}, {case_clauses, lens_r(4)}];
+expression({'case',_Line,_E0,_Cs0}) ->
+    [{expression, lens_r(3)}, {case_clauses, lens_r(4)}];
 
 %% If E is a catch expression catch E_0
 %% then Rep(E) = {'catch',LINE,Rep(E_0)}.
-expr({'catch',_Line,_E0}) ->
-    [{expr, lens_r(3)}];
+expression({'catch',_Line,_E0}) ->
+    [{expression, lens_r(3)}];
 
 %% If E is a cons skeleton [E_h | E_t]
 %% then Rep(E) = {cons,LINE,Rep(E_h),Rep(E_t)}.
-expr({cons,_Line,_H0,_T0}) ->
-    [{expr, lens_r(3)}, {expr, lens_r(4)}];
+expression({cons,_Line,_H0,_T0}) ->
+    [{expression, lens_r(3)}, {expression, lens_r(4)}];
 
 %% If E is a fun expression fun Body
 %% then Rep(E) = {'fun',LINE, Rep(FB) }.
 %% For Rep(FB), see below.
-expr({'fun',_Line, _Body}) ->
+expression({'fun',_Line, _Body}) ->
     [{function_body, lens_r(3)}];
 
 %% If E is a fun expression fun Name Fc_1 ; ... ; Name Fc_k end
 %% where Name is a variable and each Fc_i is a function clause
 %% then Rep(E) = {named_fun,LINE,Name,[Rep(Fc_1), ..., Rep(Fc_k)]}.
-expr({named_fun,_Loc,_Name,_Cs}) ->
+expression({named_fun,_Loc,_Name,_Cs}) ->
     [{fun_clauses, lens_r(4)}];
 
 %% If E is a function call E_m:E_0(E_1, ..., E_k)
 %% then Rep(E) = {call,LINE,{remote,LINE,Rep(E_m),Rep(E_0)},[Rep(E_1), ..., Rep(E_k)]}.
-expr({call,_Line1, {remote,_Line2,_M0,_F0}, _As0}) ->
-    [{expr_call_remote, lens_r(3)}, {exprs, lens_r(4)}];
+expression({call,_Line1, {remote,_Line2,_M0,_F0}, _As0}) ->
+    [{expression_call_remote, lens_r(3)}, {expressions, lens_r(4)}];
 
 %% If E is a function call E_0(E_1, ..., E_k)
 %% then Rep(E) = {call,LINE,Rep(E_0),[Rep(E_1), ..., Rep(E_k)]}.
-expr({call,_Line,_F0,_As0}) ->
-    [{expr, lens_r(3)}, {exprs, lens_r(4)}];
+expression({call,_Line,_F0,_As0}) ->
+    [{expression, lens_r(3)}, {expressions, lens_r(4)}];
 
 %% If E is an if expression if Ic_1 ; ... ; Ic_k end
 %% where each Ic_i is an if clause, then Rep(E) = {'if',LINE,[Rep(Ic_1), ..., Rep(Ic_k)]}.
-expr({'if',_Line,_Cs0}) ->
+expression({'if',_Line,_Cs0}) ->
     [{if_clauses, lens_r(3)}];
 %% If E is a list comprehension [E_0 || Q_1, ..., Q_k]
 %% where each Q_i is a qualifier
 %% then Rep(E) = {lc,LINE,Rep(E_0),[Rep(Q_1), ..., Rep(Q_k)]}. For Rep(Q), see below.
-expr({lc,_Line,_E0,_Qs0}) ->
-    [{expr, lens_r(3)}, {lc_bc_quals, lens_r(4)}];
+expression({lc,_Line,_E0,_Qs0}) ->
+    [{expression, lens_r(3)}, {lc_bc_quals, lens_r(4)}];
 
 %% If E is a map creation #{EA_1, ..., EA_k}
 %% where each EA_i is an association E_i_1 => E_i_2 or E_i_1 := E_i_2
 %% then Rep(E) = {map,LINE,[Rep(EA_1), ..., Rep(EA_k)]}.
 %% For Rep(EA), see below.
-expr({map,_Line,_Es0}) ->
-    [{expr_associations, lens_r(3)}];
+expression({map,_Line,_Es0}) ->
+    [{expression_associations, lens_r(3)}];
 
 %% If E is a map update E_0#{EA_1, ..., EA_k}
 %% where each EA_i is an association E_i_1 => E_i_2 or E_i_1 := E_i_2, 
 %% then Rep(E) = {map,LINE,Rep(E_0),[Rep(EA_1), ..., Rep(EA_k)]}.
 %% For Rep(EA), see below.
-expr({map,_Line,_Map0,_Es0}) ->
-    [{expr, lens_r(3)}, {expr_associations, lens_r(4)}];
+expression({map,_Line,_Map0,_Es0}) ->
+    [{expression, lens_r(3)}, {expression_associations, lens_r(4)}];
 
 %% If E is a match operator expression P = E_0
 %% where P is a pattern
 %% then Rep(E) = {match,LINE,Rep(P),Rep(E_0)}.
-expr({match,_Line,_P0,_E0}) ->
-    [{pattern, lens_r(3)}, {expr, lens_r(4)}];
+expression({match,_Line,_P0,_E0}) ->
+    [{pattern, lens_r(3)}, {expression, lens_r(4)}];
 
 %% If E is nil, []
 %% then Rep(E) = {nil,LINE}.
-expr({nil,_Line}) -> [];
+expression({nil,_Line}) -> [];
 
 %% If E is an operator expression E_1 Op E_2
 %% where Op is a binary operator other than match operator =
 %% then Rep(E) = {op,LINE,Op,Rep(E_1),Rep(E_2)}.
-expr({op,_Line,_Op,_L0,_R0}) ->
-    [{expr, lens_r(4)}, {expr, lens_r(5)}];
+expression({op,_Line,_Op,_L0,_R0}) ->
+    [{expression, lens_r(4)}, {expression, lens_r(5)}];
 
 %% If E is an operator expression Op E_0
 %% where Op is a unary operator, then Rep(E) = {op,LINE,Op,Rep(E_0)}.
-expr({op,_Line,_Op,_A0}) ->
-    [{expr, lens_r(4)}];
+expression({op,_Line,_Op,_A0}) ->
+    [{expression, lens_r(4)}];
 
 %% If E is a receive expression receive Cc_1 ; ... ; Cc_k end, 
 %% where each Cc_i is a case clause, 
 %% then Rep(E) = {'receive',LINE,[Rep(Cc_1), ..., Rep(Cc_k)]}.
-expr({'receive',_Line,_Cs0}) ->
+expression({'receive',_Line,_Cs0}) ->
     [{receive_clauses, lens_r(3)}];
 
 %% If E is a receive expression receive Cc_1 ; ... ; Cc_k after E_0 -> B_t end
 %% where each Cc_i is a case clause, E_0 is an expression, and B_t is a body
 %% then Rep(E) = {'receive',LINE,[Rep(Cc_1), ..., Rep(Cc_k)],Rep(E_0),Rep(B_t)}.
-expr({'receive',_Line,_Cs0,_To0,_ToEs0}) ->
-    [{receive_clauses, lens_r(3)}, {expr, lens_r(4)}, {exprs, lens_r(5)}];
+expression({'receive',_Line,_Cs0,_To0,_ToEs0}) ->
+    [{receive_clauses, lens_r(3)}, {expression, lens_r(4)}, {expressions, lens_r(5)}];
 
 %% If E is a record creation #Name{Field_1=E_1, ..., Field_k=E_k}, 
 %% where each Field_i is an atom or _, 
 %% then Rep(E) = {record,LINE,Name,[{record_field,LINE,Rep(Field_1),Rep(E_1)}, ..., {record_field,LINE,Rep(Field_k),Rep(E_k)}]}.
-expr({record,_Line,_Name,_Inits0}) ->
+expression({record,_Line,_Name,_Inits0}) ->
     [{record_inits, lens_r(4)}];
 
 %% If E is a record field access E_0#Name.Field
 %% where Field is an atom
 %% then Rep(E) = {record_field,LINE,Rep(E_0),Name,Rep(Field)}.
-expr({record_field,_Line,_Rec0,_Name,{atom, _Line1, _Field}}) ->
-    [{expr, lens_r(3)}, {expr, lens_r(5)}];
+expression({record_field,_Line,_Rec0,_Name,{atom, _Line1, _Field}}) ->
+    [{expression, lens_r(3)}, {expression, lens_r(5)}];
 
 %% If E is a record field index #Name.Field
 %% where Field is an atom
 %% then Rep(E) = {record_index,LINE,Name,Rep(Field)}.
-expr({record_index,_Line,_Name,{atom, _Line1, _Field}}) ->
-    [{expr, lens_r(4)}];
+expression({record_index,_Line,_Name,{atom, _Line1, _Field}}) ->
+    [{expression, lens_r(4)}];
 
 %% If E is a record update E_0#Name{Field_1=E_1, ..., Field_k=E_k}
 %% where each Field_i is an atom
 %% then Rep(E) = {record,LINE,Rep(E_0),Name,[{record_field,LINE,Rep(Field_1),Rep(E_1)}, ..., {record_field,LINE,Rep(Field_k),Rep(E_k)}]}.
-expr({record,_Line,_Rec0,_Name,_Upds0}) ->
-    [{expr, lens_r(3)}, {record_updates, lens_r(5)}];
+expression({record,_Line,_Rec0,_Name,_Upds0}) ->
+    [{expression, lens_r(3)}, {record_updates, lens_r(5)}];
 
 %% If E is a tuple skeleton {E_1, ..., E_k}
 %% then Rep(E) = {tuple,LINE,[Rep(E_1), ..., Rep(E_k)]}.
-expr({tuple,_Line,_Es0}) ->
-    [{exprs, lens_r(3)}];
+expression({tuple,_Line,_Es0}) ->
+    [{expressions, lens_r(3)}];
 
 %% If E is a try expression try B of Cc_1 ; ... ; Cc_k catch Tc_1 ; ... ; Tc_n end
 %% where B is a body, each Cc_i is a case clause, and each Tc_j is a catch clause
@@ -689,31 +690,31 @@ expr({tuple,_Line,_Es0}) ->
 %% If E is a try expression try B of Cc_1 ; ... ; Cc_k catch Tc_1 ; ... ; Tc_n after A end
 %% where B and A are a bodies, each Cc_i is a case clause, and each Tc_j is a catch clause, 
 %% then Rep(E) = {'try',LINE,Rep(B),[Rep(Cc_1), ..., Rep(Cc_k)],[Rep(Tc_1), ..., Rep(Tc_n)],Rep(A)}.
-expr({'try',_Line,_Es0,_Scs0,_Ccs0,_As0}) ->
-    [{exprs, lens_r(3)}, {try_clauses, lens_r(4)}, {catch_clauses, lens_r(5)}, {exprs, lens_r(6)}];
+expression({'try',_Line,_Es0,_Scs0,_Ccs0,_As0}) ->
+    [{expressions, lens_r(3)}, {try_clauses, lens_r(4)}, {catch_clauses, lens_r(5)}, {expressions, lens_r(6)}];
 
 %% If E is a variable V, then Rep(E) = {var,LINE,A},
 %% where A is an atom with a printname consisting of the same characters as V.
-expr({var,_Line,_V}) -> [].
+expression({var,_Line,_V}) -> [].
 
-expr_bin_elements(BinElements) ->
-    children(expr_bin_elements, expr_bin_element, BinElements).
+expression_bin_elements(BinElements) ->
+    children(expression_bin_elements, expression_bin_element, BinElements).
 
 %% if EBE is a bin element P:Size/TSL
 %% Rep(EBE) = Rep(BE).
-expr_bin_element(BinElement) ->
-    bin_element(expr, BinElement).
+expression_bin_element(BinElement) ->
+    bin_element(expression, BinElement).
 
-expr_associations(Associations) ->
-    children(expr_associations, expr_association, Associations).
+expression_associations(Associations) ->
+    children(expression_associations, expression_association, Associations).
 
 %% If EA is an association K => V or K := V
 %% then Rep(EA) = Rep(A)
-expr_association(Association) ->
-    association(expr, Association).
+expression_association(Association) ->
+    association(expression, Association).
 
-expr_call_remote({remote,_Line2,_M0,_F0}) ->
-    [{expr, lens_r(3)}, {expr, lens_r(4)}].
+expression_call_remote({remote,_Line2,_M0,_F0}) ->
+    [{expression, lens_r(3)}, {expression, lens_r(4)}].
 
 %% If FB is a fun expression Name/Arity
 %% then Rep(FB) = {function,Name,Arity}.
@@ -725,19 +726,12 @@ function_body({function,_F,_A}) ->
 function_body({function,M,F,A}) when is_atom(M), is_atom(F), is_integer(A) ->
     [];
 function_body({function,_M0,_F0,_A0}) ->
-    [{expr, lens_r(N)} || N <- [2,3,4]];
+    [{expression, lens_r(N)} || N <- [2,3,4]];
 %% If FB is a fun expression Fc_1 ; ... ; Fc_k end
 %% where each Fc_i is a function clause
 %% then Rep(E) = {clauses,[Rep(Fc_1), ..., Rep(Fc_k)]}.
 function_body({clauses,_Cs0}) ->
     [{fun_clauses, lens_r(2)}].
-
-%% -type expr_list([Expression]) -> [Expression].
-%%  These expressions are processed "in parallel" for purposes of variable
-%%  definition etc.
-
-expr_list(ExprList) when is_list(ExprList) ->
-    children(expr_list, expr, ExprList).
 
 %% -type record_inits([RecordInit]) -> [RecordInit].
 %%  N.B. Field names are full expressions here but only atoms are allowed
@@ -746,7 +740,7 @@ record_inits(Inits) when is_list(Inits) ->
     children(record_inits, record_init, Inits).
 
 record_init(Init) ->
-    record_field(expr, Init).
+    record_field(expression, Init).
 
 %% -type record_updates([RecordUpd]) -> [RecordUpd].
 %%  N.B. Field names are full expressions here but only atoms are allowed
@@ -756,7 +750,7 @@ record_updates(Updates) when is_list(Updates) ->
     children(record_updates, record_update, Updates).
 
 record_update({record_field,_Lf,{atom,_La,_F},_Val0}) ->
-    [{expr, lens_r(3)}, {expr, lens_r(4)}].
+    [{expression, lens_r(3)}, {expression, lens_r(4)}].
 
 catch_clauses(Clauses) when is_list(Clauses) ->
     children(catch_clauses, catch_clause, Clauses).
@@ -797,18 +791,18 @@ lc_bc_quals(Quals) when is_list(Quals) ->
 %% If Q is a generator P <- E, where P is a pattern and E is an expression
 %% then Rep(Q) = {generate,LINE,Rep(P),Rep(E)}.
 lc_bc_qual({generate,_Line,_P0,_E0}) ->
-    [{pattern, lens_r(3)}, {expr, lens_r(4)}];
+    [{pattern, lens_r(3)}, {expression, lens_r(4)}];
 
 %% If Q is a bitstring generator P <= E,
 %% where P is a pattern and E is an expression
 %% then Rep(Q) = {b_generate,LINE,Rep(P),Rep(E)}.
 lc_bc_qual({b_generate,_Line,_P0,_E0}) ->
-    [{pattern, lens_r(3)}, {expr, lens_r(4)}];
+    [{pattern, lens_r(3)}, {expression, lens_r(4)}];
 
 %% If Q is a filter E, where E is an expression
 %% then Rep(Q) = Rep(E).
 lc_bc_qual(_Quals) ->
-    [{expr, lens_id()}].
+    [{expression, lens_id()}].
 
 %% -type fun_clauses([Clause]) -> [Clause].
 
@@ -986,7 +980,7 @@ types(Types) when is_list(Types) ->
 %% if BE is a bin element P:Size/TSL
 %% Rep(BE) = [{bin_element,LINE, Rep(ST),Rep(Size),Rep(TSL)}
 %% while sub_type is pattern, Rep(ST) = Rep(P), Rep(Size) = Rep(E),
-%% while sub_type is expr, Rep(ST) = Rep(E), Rep(Size) = Rep(E),
+%% while sub_type is expression, Rep(ST) = Rep(E), Rep(Size) = Rep(E),
 %% while sub_type is guard test, Rep(ST) = Rep(Gt), Rep(Size) = Rep(Gt)
 %% An omitted Size is represented by default
 %% An omitted TSL is represented by default.
@@ -997,7 +991,7 @@ bin_element(SubType, {bin_element,_L1,_P1, S1, T1}) ->
             guard_test ->
                 guard_test;
             _ ->
-                expr
+                expression
         end,
     [{SubType, lens_r(3)}|
      sub_lenses([{lens_r(4), default_or(EType, S1)}, {lens_r(5), default_or(bit_type_specifiers, T1)}])].
@@ -1018,7 +1012,7 @@ bit_type_specifier({Atom, Integer}) when is_atom(Atom), is_integer(Integer) ->
 %% then Rep(A) = {map_field_assoc,LINE,Rep(K),Rep(V)}.
 %% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
 %% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-%% while sub_type is expr, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
 association(SubType, {map_field_assoc,_Line,_K,_V}) ->
     [{SubType, lens_r(3)}, {SubType, lens_r(4)}];
 
@@ -1026,7 +1020,7 @@ association(SubType, {map_field_assoc,_Line,_K,_V}) ->
 %% then Rep(A) = {map_field_exact,LINE,Rep(K),Rep(V)}.
 %% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
 %% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-%% while sub_type is expr, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
 association(SubType, {map_field_exact,_Line,_K,_V}) ->
     [{SubType, lens_r(3)}, {SubType, lens_r(4)}].
 
@@ -1034,7 +1028,7 @@ association(SubType, {map_field_exact,_Line,_K,_V}) ->
 %% then Rep(RF) = {record_field,LINE,Rep(Field),Rep(ST)}
 %% while sub_type is pattern, Rep(ST) = Rep(P)
 %% while sub_type is guard_test, Rep(ST) = Rep(Gt)
-%% while sub_type is expr, Rep(ST) = Rep(E)
+%% while sub_type is expression, Rep(ST) = Rep(E)
 %% where Rep(Field) is an atom or _,
 record_field(Type, {record_field,_Lf,{atom,_La,_F},_P0}) ->
     [{Type, lens_r(3)}, {Type, lens_r(4)}];
