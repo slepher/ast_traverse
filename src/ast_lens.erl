@@ -115,6 +115,10 @@ default_or(Type, _Value) ->
 
 %% forms(Fs) -> lists:map((F) -> form(F) end, Fs).
 
+%%%===================================================================
+%%% forms
+%%%===================================================================
+
 forms(Forms) when is_list(Forms) ->
     children(forms, form, Forms).
 
@@ -254,6 +258,11 @@ variable({var, _Line, _Var}) ->
 clause({clause,_Line,_H0,_G0,_B0}) ->
     [{patterns, lens_r(3)}, {guards, lens_r(4)}, {expressions, lens_r(5)}].
 
+
+%%%===================================================================
+%%% patterns
+%%%===================================================================
+
 %% -type patterns([Pattern]) -> [Pattern].
 %%  These patterns are processed "sequentially" for purposes of variable
 %%  definition etc.
@@ -374,6 +383,10 @@ pattern_record_field(Field) ->
 
 pattern_record_field_index(Field) ->
     record_field_index(Field).
+
+%%%===================================================================
+%%% guards
+%%%===================================================================
 
 %% -type guard([GuardTest]) -> [GuardTest].
 
@@ -522,6 +535,10 @@ guard_test_record_field(Field) ->
 
 guard_test_record_field_index(Field) ->
     record_field_index(Field).
+
+%%%===================================================================
+%%% expressions
+%%%===================================================================
 
 %% -type expressions([Expression]) -> [Expression].
 %%  These expressions are processed "sequentially" for purposes of variable
@@ -816,6 +833,84 @@ lc_bc_qual({b_generate,_Line,_P0,_E0}) ->
 lc_bc_qual(_Quals) ->
     [{expression, lens_id()}].
 
+%%%===================================================================
+%%% common functions for paterns, guards, expressions
+%%%===================================================================
+
+%% if BE is a bin element P:Size/TSL
+%% Rep(BE) = [{bin_element,LINE, Rep(ST),Rep(Size),Rep(TSL)}
+%% while sub_type is pattern, Rep(ST) = Rep(P), Rep(Size) = Rep(E),
+%% while sub_type is expression, Rep(ST) = Rep(E), Rep(Size) = Rep(E),
+%% while sub_type is guard test, Rep(ST) = Rep(Gt), Rep(Size) = Rep(Gt)
+%% An omitted Size is represented by default
+%% An omitted TSL is represented by default.
+%% For Rep(TSL), see below
+bin_element(SubType, {bin_element,_L1,_P1, S1, T1}) ->
+    EType = 
+        case SubType of
+            guard_test ->
+                guard_test;
+            _ ->
+                expression
+        end,
+    [{SubType, lens_r(3)}|
+     sub_lenses([{lens_r(4), default_or(EType, S1)}, {lens_r(5), default_or(bit_type_specifiers, T1)}])].
+
+%% A type specifier list TSL for a bitstring element is a sequence of type specifiers TS_1 - ... - TS_k
+%% and Rep(TSL) = [Rep(TS_1), ..., Rep(TS_k)].
+bit_type_specifiers(BitTypes) ->
+    children(bit_type_specifiers, bit_type_specifier, BitTypes).
+
+%% If TS is a type specifier A, where A is an atom, then Rep(TS) = A.
+bit_type_specifier(Atom) when is_atom(Atom) ->
+    [];
+%% If TS is a type specifier A:Value, where A is an atom and Value is an integer, then Rep(TS) = {A,Value}.
+bit_type_specifier({Atom, Integer}) when is_atom(Atom), is_integer(Integer) ->
+    [].
+
+%% If A is an association K => V
+%% then Rep(A) = {map_field_assoc,LINE,Rep(K),Rep(V)}.
+%% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
+%% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+association(SubType, {map_field_assoc,_Line,_K,_V}) ->
+    [{SubType, lens_r(3)}, {SubType, lens_r(4)}];
+
+%% If A is an association K := V
+%% then Rep(A) = {map_field_exact,LINE,Rep(K),Rep(V)}.
+%% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
+%% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
+association(SubType, {map_field_exact,_Line,_K,_V}) ->
+    [{SubType, lens_r(3)}, {SubType, lens_r(4)}].
+
+%% if RF is a record field Field = Value,
+%% then Rep(RF) = {record_field,LINE,Rep(Field),Rep(ST)}
+%% while sub_type is pattern, Rep(ST) = Rep(P)
+%% while sub_type is guard_test, Rep(ST) = Rep(Gt)
+%% while sub_type is expression, Rep(ST) = Rep(E)
+%% where Rep(Field) is an atom or _,
+record_field(Type, {record_field,_Lf,{atom,_La,_F},_P0}) ->
+    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}];
+record_field(Type, {record_field,_Lf,{var,_La,'_'},_P0}) ->
+    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}].
+
+record_field_index_type(pattern) ->
+    pattern_record_field_index;
+record_field_index_type(guard_test) ->
+    guard_test_record_field_index;
+record_field_index_type(expression) ->
+    expression_record_field_index.
+
+record_field_index({atom,_Line,_Atom}) ->
+    [];
+record_field_index({var,_Line, '_'}) ->
+    [].
+
+%%%===================================================================
+%%% types and function_types
+%%%===================================================================
+
 %% -type fun_clauses([Clause]) -> [Clause].
 
 function_types(List) when is_list(List) ->
@@ -993,73 +1088,5 @@ field_type({type,_Line,field_type,[{atom,_La,_A},_T]}) ->
 types(Types) when is_list(Types) ->
     children(types, type, Types).
 
-%% if BE is a bin element P:Size/TSL
-%% Rep(BE) = [{bin_element,LINE, Rep(ST),Rep(Size),Rep(TSL)}
-%% while sub_type is pattern, Rep(ST) = Rep(P), Rep(Size) = Rep(E),
-%% while sub_type is expression, Rep(ST) = Rep(E), Rep(Size) = Rep(E),
-%% while sub_type is guard test, Rep(ST) = Rep(Gt), Rep(Size) = Rep(Gt)
-%% An omitted Size is represented by default
-%% An omitted TSL is represented by default.
-%% For Rep(TSL), see below
-bin_element(SubType, {bin_element,_L1,_P1, S1, T1}) ->
-    EType = 
-        case SubType of
-            guard_test ->
-                guard_test;
-            _ ->
-                expression
-        end,
-    [{SubType, lens_r(3)}|
-     sub_lenses([{lens_r(4), default_or(EType, S1)}, {lens_r(5), default_or(bit_type_specifiers, T1)}])].
 
-%% A type specifier list TSL for a bitstring element is a sequence of type specifiers TS_1 - ... - TS_k
-%% and Rep(TSL) = [Rep(TS_1), ..., Rep(TS_k)].
-bit_type_specifiers(BitTypes) ->
-    children(bit_type_specifiers, bit_type_specifier, BitTypes).
-
-%% If TS is a type specifier A, where A is an atom, then Rep(TS) = A.
-bit_type_specifier(Atom) when is_atom(Atom) ->
-    [];
-%% If TS is a type specifier A:Value, where A is an atom and Value is an integer, then Rep(TS) = {A,Value}.
-bit_type_specifier({Atom, Integer}) when is_atom(Atom), is_integer(Integer) ->
-    [].
-
-%% If A is an association K => V
-%% then Rep(A) = {map_field_assoc,LINE,Rep(K),Rep(V)}.
-%% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
-%% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-association(SubType, {map_field_assoc,_Line,_K,_V}) ->
-    [{SubType, lens_r(3)}, {SubType, lens_r(4)}];
-
-%% If A is an association K := V
-%% then Rep(A) = {map_field_exact,LINE,Rep(K),Rep(V)}.
-%% while sub_type is pattern, Rep(K) = Rep(P), Rep(V) = Rep(P)
-%% while sub_type is guard_test, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-%% while sub_type is expression, Rep(K) = Rep(Gt), Rep(V) = Rep(Gt)
-association(SubType, {map_field_exact,_Line,_K,_V}) ->
-    [{SubType, lens_r(3)}, {SubType, lens_r(4)}].
-
-%% if RF is a record field Field = Value,
-%% then Rep(RF) = {record_field,LINE,Rep(Field),Rep(ST)}
-%% while sub_type is pattern, Rep(ST) = Rep(P)
-%% while sub_type is guard_test, Rep(ST) = Rep(Gt)
-%% while sub_type is expression, Rep(ST) = Rep(E)
-%% where Rep(Field) is an atom or _,
-record_field(Type, {record_field,_Lf,{atom,_La,_F},_P0}) ->
-    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}];
-record_field(Type, {record_field,_Lf,{var,_La,'_'},_P0}) ->
-    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}].
-
-record_field_index_type(pattern) ->
-    pattern_record_field_index;
-record_field_index_type(guard_test) ->
-    guard_test_record_field_index;
-record_field_index_type(expression) ->
-    expression_record_field_index.
-
-record_field_index({atom,_Line,_Atom}) ->
-    [];
-record_field_index({var,_Line, '_'}) ->
-    [].
 
