@@ -32,7 +32,7 @@
 -export([expressions/1, expression/1]).
 -export([expression_bin_elements/1, expression_bin_element/1]).
 -export([expression_associations/1, expression_association/1]).
--export([expression_call_remote/1]).
+-export([expression_call_remote/1, function_body/1]).
 -export([record_field_inits/1, record_field_init/1]).
 -export([record_field_updates/1, record_field_update/1]).
 -export([expression_record_field_index/1]).
@@ -40,9 +40,10 @@
 -export([case_clauses/1, case_clause/1, if_clauses/1, if_clause/1]).
 -export([receive_clauses/1, receive_clause/1, catch_clauses/1, catch_clause/1]).
 -export([lc_bc_quals/1, lc_bc_qual/1]).
--export([function_types/1, function_type1/1, function_type/1, function_constraint/1, function_body/1]).
-
--export([constraint/1, types/1, type/1, association_types/1, association_type/1, field_types/1, field_type/1]).
+-export([function_types/1, function_type/1, type_function_args/1]).
+-export([function_constraints/1, function_constraint/1, constraint_is_sub_type/1]).
+-export([types/1, type/1]).
+-export([association_types/1, association_type/1, field_types/1, field_type/1]).
 -export([bit_type_specifiers/1, bit_type_specifier/1]).
 
 %%%===================================================================
@@ -825,23 +826,33 @@ function_types(List) when is_list(List) ->
 %% then Rep(T) = {type,LINE,bounded_fun,[Rep(Ft_1),Rep(Fc)]}. For Rep(Fc), see below.
 
 function_type({type,_Line,bounded_fun,[_Ft,_Fc]}) ->
-    [{Type, c(lens_r(4), lens_l(N))} || {Type, N} <- [{function_type, 1}, {function_constraint, 2}]];
+    [{Type, c(lens_r(4), lens_l(N))} || 
+        {Type, N} <- [{function_type, 1}, {function_constraints, 2}]];
 function_type(Ft) ->
     function_type1(Ft).
 
 %% If Ft is a function type (T_1, ..., T_n) -> T_0, where each T_i is a type
 %% then Rep(Ft) = {type,LINE,'fun',[{type,LINE,product,[Rep(T_1), ..., Rep(T_n)]},Rep(T_0)]}.
 function_type1({type,_Line,'fun',[{type,_Lt,product,_As},_B]}) ->
-    [{type, c(lens_r(4), lens_l(1))}, {type, c(lens_r(4), lens_l(2))}].
+    [{type_function_args, c(lens_r(4), lens_l(1))}, {type, c(lens_r(4), lens_l(2))}].
 
-function_constraint(Constraints) when is_list(Constraints) ->
-    children(function_constraint, constraint, Constraints).
+type_function_args({type,_Line,product,_As}) ->
+    [{types, lens_r(4)}];
+type_function_args({type,_Line, any}) ->
+    [].
+
+function_constraints(Constraints) when is_list(Constraints) ->
+    children(function_constraints, function_constraint, Constraints).
 
 %% If C is a constraint V :: T
 %% where V is a type variable and T is a type
 %% then Rep(C) = {type,LINE,constraint,[{atom,LINE,is_subtype},[Rep(V),Rep(T)]]}.
-constraint({type,_Line, constraint,[{atom,_L,_A},[_V,_T]]}) ->
-    [{type, c(lens_r(4), lens_l(1))}|[{type, c(lens_r(4), c(lens_l(2), lens_l(N)))} || N <- [1, 2]]].
+function_constraint({type,_Line, constraint,[{atom,_L,_A},[_V,_T]]}) ->
+    [{constraint_is_sub_type, c(lens_r(4), lens_l(1))}|
+     [{type, c(lens_r(4), c(lens_l(2), lens_l(N)))} || N <- [1, 2]]].
+
+constraint_is_sub_type({atom,_Line,_Atom}) ->
+    [].
 
 %% If T is an annotated type A :: T_0
 %% where A is a variable
@@ -871,11 +882,8 @@ type({type,_Line,'fun',[]}) ->
     [];
 %% If T is a fun type fun((...) -> T_0)
 %% then Rep(T) = {type,LINE,'fun',[{type,LINE,any},Rep(T_0)]}.
-type({type,_Line,'fun',[{type,_Lt,any},_B]}) ->
-    [{type, c(lens_r(4), lens_l(L))} || L <- [1,2]];
-
-type({type,_Line, any}) ->
-    [];
+type({type,_Line,'fun',[{type,_Lt,any},_B]} = Type) ->
+    function_type(Type);
 
 %% If T is a fun type fun(Ft)
 %% where Ft is a function type, then Rep(T) = Rep(Ft). For Rep(Ft), see below.
@@ -883,9 +891,6 @@ type({type,_Line,bounded_fun,_As} = Type) ->
     function_type(Type);
 type({type,_Line,'fun',[{type,_Line1,product,_As}, _B]} = Type) ->
     function_type(Type);
-
-type({type,_Line,product,_As}) ->
-    [{types, lens_r(4)}];
 
 %% If T is an integer range type L .. H
 %% where L and H are singleton integer types
