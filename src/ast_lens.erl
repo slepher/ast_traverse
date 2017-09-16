@@ -20,18 +20,22 @@
 -export([pattern_bin_elements/1, pattern_bin_element/1]).
 -export([pattern_associations/1, pattern_association/1]).
 -export([pattern_record_fields/1, pattern_record_field/1]).
+-export([pattern_record_field_index/1]).
 %% guards
 -export([guards/1, guard/1, guard_test/1]).
 -export([guard_bin_elements/1, guard_bin_element/1]).
 -export([guard_test_associations/1, guard_test_association/1]).
 -export([guard_test_call_remote/1]).
 -export([guard_test_record_fields/1, guard_test_record_field/1]).
+-export([guard_test_record_field_index/1]).
 %% expressions
 -export([expressions/1, expression/1]).
 -export([expression_bin_elements/1, expression_bin_element/1]).
 -export([expression_associations/1, expression_association/1]).
 -export([expression_call_remote/1]).
--export([record_inits/1, record_init/1, record_updates/1, record_update/1]).
+-export([record_field_inits/1, record_field_init/1]).
+-export([record_field_updates/1, record_field_update/1]).
+-export([expression_record_field_index/1]).
 -export([fun_clauses/1, fun_clause/1]).
 -export([case_clauses/1, case_clause/1, if_clauses/1, if_clause/1]).
 -export([receive_clauses/1, receive_clause/1, catch_clauses/1, catch_clause/1]).
@@ -319,7 +323,7 @@ pattern({op,_Line,_Op,_A}) ->
 %% If P is a record field index pattern #Name.Field
 %% where Field is an atom, then Rep(P) = {record_index,LINE,Name,Rep(Field)}.
 pattern({record_index,_Line,_Name,{atom, _Line, _Field}}) ->
-    [{pattern, lens_r(4)}];
+    [{pattern_record_field_index, lens_r(4)}];
 
 %% If P is a record pattern #Name{PF_1, ..., PF_k}
 %% then Rep(P) = {record,LINE,Name,[Rep(PF_1), ..., Rep(PF_k)]}.
@@ -361,13 +365,14 @@ pattern_association({map_field_exact,_Line,_K,_V}) ->
 pattern_record_fields(Fields) ->
     children(pattern_record_fields, pattern_record_field, Fields).
 
-
 %% if PF is an record field pattern Field = Value,
 %% then Rep(PRF) = Rep(RF)
 %% for Rep(RF), see below.
 pattern_record_field(Field) ->
     record_field(pattern, Field).
 
+pattern_record_field_index(Field) ->
+    record_field_index(Field).
 
 %% -type guard([GuardTest]) -> [GuardTest].
 
@@ -471,12 +476,12 @@ guard_test({record,_Line,_Name,_Inits0}) ->
 %% where Field is an atom
 %% then Rep(Gt) = {record_field,LINE,Rep(Gt_0),Name,Rep(Field)}.
 guard_test({record_field,_Line0,_Rec0,_Name,{atom,_Line1,_Field0}}) ->
-    [{guard_test, lens_r(3)}, {guard_test, lens_r(5)}];
+    [{guard_test, lens_r(3)}, {guard_test_record_field_index, lens_r(5)}];
 %% If Gt is a record field index #Name.Field
 %% where Field is an atom
 %% then Rep(Gt) = {record_index,LINE,Name,Rep(Field)}.
 guard_test({record_index,_Line0,_Name,{atom,_Line1,_Field0}}) ->
-    [{guard_test, lens_r(5)}];
+    [{guard_test_record_field_index, lens_r(5)}];
 %% If Gt is a tuple skeleton {Gt_1, ..., Gt_k}
 %% then Rep(Gt) = {tuple,LINE,[Rep(Gt_1), ..., Rep(Gt_k)]}.
 guard_test({tuple,_Line,_Es0}) ->
@@ -513,6 +518,9 @@ guard_test_record_fields(Inits) when is_list(Inits) ->
 
 guard_test_record_field(Field) ->
     record_field(guard_test, Field).
+
+guard_test_record_field_index(Field) ->
+    record_field_index(Field).
 
 %% -type expressions([Expression]) -> [Expression].
 %%  These expressions are processed "sequentially" for purposes of variable
@@ -645,25 +653,25 @@ expression({'receive',_Line,_Cs0,_To0,_ToEs0}) ->
 %% where each Field_i is an atom or _, 
 %% then Rep(E) = {record,LINE,Name,[{record_field,LINE,Rep(Field_1),Rep(E_1)}, ..., {record_field,LINE,Rep(Field_k),Rep(E_k)}]}.
 expression({record,_Line,_Name,_Inits0}) ->
-    [{record_inits, lens_r(4)}];
+    [{record_field_inits, lens_r(4)}];
 
 %% If E is a record field access E_0#Name.Field
 %% where Field is an atom
 %% then Rep(E) = {record_field,LINE,Rep(E_0),Name,Rep(Field)}.
 expression({record_field,_Line,_Rec0,_Name,{atom, _Line1, _Field}}) ->
-    [{expression, lens_r(3)}, {expression, lens_r(5)}];
+    [{expression, lens_r(3)}, {expression_record_field_index, lens_r(5)}];
 
 %% If E is a record field index #Name.Field
 %% where Field is an atom
 %% then Rep(E) = {record_index,LINE,Name,Rep(Field)}.
 expression({record_index,_Line,_Name,{atom, _Line1, _Field}}) ->
-    [{expression, lens_r(4)}];
+    [{expression_record_field_index, lens_r(4)}];
 
 %% If E is a record update E_0#Name{Field_1=E_1, ..., Field_k=E_k}
 %% where each Field_i is an atom
 %% then Rep(E) = {record,LINE,Rep(E_0),Name,[{record_field,LINE,Rep(Field_1),Rep(E_1)}, ..., {record_field,LINE,Rep(Field_k),Rep(E_k)}]}.
 expression({record,_Line,_Rec0,_Name,_Upds0}) ->
-    [{expression, lens_r(3)}, {record_updates, lens_r(5)}];
+    [{expression, lens_r(3)}, {record_field_updates, lens_r(5)}];
 
 %% If E is a tuple skeleton {E_1, ..., E_k}
 %% then Rep(E) = {tuple,LINE,[Rep(E_1), ..., Rep(E_k)]}.
@@ -733,24 +741,27 @@ function_body({function,_M0,_F0,_A0}) ->
 function_body({clauses,_Cs0}) ->
     [{fun_clauses, lens_r(2)}].
 
-%% -type record_inits([RecordInit]) -> [RecordInit].
+%% -type record_field_inits([RecordInit]) -> [RecordInit].
 %%  N.B. Field names are full expressions here but only atoms are allowed
 %%  by the *linter*!.
-record_inits(Inits) when is_list(Inits) ->
-    children(record_inits, record_init, Inits).
+record_field_inits(Inits) when is_list(Inits) ->
+    children(record_field_inits, record_field_init, Inits).
 
-record_init(Init) ->
+record_field_init(Init) ->
     record_field(expression, Init).
 
-%% -type record_updates([RecordUpd]) -> [RecordUpd].
+%% -type record_field_updates([RecordUpd]) -> [RecordUpd].
 %%  N.B. Field names are full expressions here but only atoms are allowed
 %%  by the *linter*!.
 
-record_updates(Updates) when is_list(Updates) ->
-    children(record_updates, record_update, Updates).
+record_field_updates(Updates) when is_list(Updates) ->
+    children(record_field_updates, record_field_update, Updates).
 
-record_update({record_field,_Lf,{atom,_La,_F},_Val0}) ->
-    [{expression, lens_r(3)}, {expression, lens_r(4)}].
+record_field_update({record_field,_Lf,{atom,_La,_F},_Val0} = Update) ->
+    record_field(expression, Update).
+
+expression_record_field_index(Field) ->
+    record_field_index(Field).
 
 catch_clauses(Clauses) when is_list(Clauses) ->
     children(catch_clauses, catch_clause, Clauses).
@@ -1031,6 +1042,19 @@ association(SubType, {map_field_exact,_Line,_K,_V}) ->
 %% while sub_type is expression, Rep(ST) = Rep(E)
 %% where Rep(Field) is an atom or _,
 record_field(Type, {record_field,_Lf,{atom,_La,_F},_P0}) ->
-    [{Type, lens_r(3)}, {Type, lens_r(4)}];
+    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}];
 record_field(Type, {record_field,_Lf,{var,_La,'_'},_P0}) ->
-    [{Type, lens_r(3)}, {Type, lens_r(4)}].
+    [{record_field_index_type(Type), lens_r(3)}, {Type, lens_r(4)}].
+
+record_field_index_type(pattern) ->
+    pattern_record_field_index;
+record_field_index_type(guard_test) ->
+    guard_test_record_field_index;
+record_field_index_type(expression) ->
+    expression_record_field_index.
+
+record_field_index({atom,_Line,_Atom}) ->
+    [];
+record_field_index({var,_Line, '_'}) ->
+    [].
+
