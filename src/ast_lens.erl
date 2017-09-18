@@ -113,8 +113,6 @@ default_or(Type, _Value) ->
 %% and adjusted according to 
 %% http://erlang.org/doc/apps/erts/absform.html
 
-%% forms(Fs) -> lists:map((F) -> form(F) end, Fs).
-
 %%%===================================================================
 %%% forms
 %%%===================================================================
