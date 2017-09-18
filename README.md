@@ -45,7 +45,7 @@ where
   
   for detials, see
 
-[ast traverse lens](https://github.com/slepher/ast_traverse/blob/master/src/ast_traverse_lens.erl)
+[ast lens](https://github.com/slepher/ast_traverse/blob/master/src/ast_lens.erl)
 
 ## list traverse
 
