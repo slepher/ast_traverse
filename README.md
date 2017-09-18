@@ -19,15 +19,15 @@ where
     t a :: ast
     t b :: ast 
 
-## for one do not famillar with monad or do not want use monad here
+## for one do not famillar with monad or do not want use monad
 
-    ast_traverse:map_reduce :: (pre | post, -> node_type -> node -> state -> (node, state)) -> init_state -> ast -> (ast, state)
+    map_reduce :: (pre | post, -> node_type -> node -> state -> (node, state)) -> init_state -> ast -> (ast, state)
 
-    ast_traverse:map_with_state :: (pre | post, -> node_type -> node -> state -> (node, state)) -> init_state -> ast -> ast
+    map_with_state :: (pre | post, -> node_type -> node -> state -> (node, state)) -> init_state -> ast -> ast
 
-    ast_traverse:map :: (pre | post -> node_type, node -> node) -> ast -> ast
+    map :: (pre | post -> node_type, node -> node) -> ast -> ast
 
-    ast_traverse:reduce :: (pre | post -> node_type -> node -> state -> state) -> ast -> init_state -> state
+    reduce :: (pre | post -> node_type -> node -> state -> state) -> ast -> init_state -> state
     
 ## explanation
 
