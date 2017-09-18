@@ -47,9 +47,9 @@ where
 
 [ast lens](https://github.com/slepher/ast_traverse/blob/master/src/ast_lens.erl)
 
-## list traverse
+## traverse order
 
-[form1, form2, form3] is traversed in such order
+[form1, form2, [([pattern1, pattern2], [[guard1]], [expression1, expression2]) = function_clause1] = form3] is traversed in such order
 
     (pre,  forms, [form1, form2, form3])
     
@@ -63,6 +63,50 @@ where
     
     (pre,  form,  form3)
     
-    (post, form,  form3)
+    (pre,  fun_clauses, [function_clause1])
+    
+    (pre,  fun_clause, function_clause1)
+    
+    (pre,  patterns, [pattern1, pattern2])
+    
+    (pre,  pattern,  pattern1)
+    
+    (post, pattern,  pattern1)
+    
+    (pre,  pattern,  pattern2)
+    
+    (post, pattern,  pattern2)
+    
+    (post, patterns  [pattern1, pattern2])
+    
+    (pre,  guards,  [[guard_test1]])
+    
+    (pre,  guard,  [guard_test1])
+    
+    (pre,  guard_test, guard_test1)
+    
+    (post, guard_test, guard_test1)
+    
+    (post, guard, [guard_test1])
+    
+    (post, guards [[guard_test1]])
+    
+    (pre,  expressions, [expression1, expression2])
+    
+    (pre,  expression, expression1)
+    
+    (post, expression, expression1)
+    
+    (pre,  expression, expression2)
+    
+    (post, expression, expression2)
+    
+    (post, expressions, [expression1, expression2])
+    
+    (post, fun_cluase, funnction_clause1)
+    
+    (post, fun_clauses, [function_clause1])
+    
+    (post, form, form3)
     
     (post, forms, [form1, form2, form3])
