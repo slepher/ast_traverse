@@ -77,7 +77,7 @@ where
     
     (post, pattern,  pattern2)
     
-    (post, patterns  [pattern1, pattern2])
+    (post, patterns, [pattern1, pattern2])
     
     (pre,  guards,  [[guard_test1]])
     
