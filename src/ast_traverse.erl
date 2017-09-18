@@ -67,8 +67,9 @@ map_m(Monad, F, XNode) ->
                         %% type of y node should be same as type of x node
                         map_m(Monad, F, Subtrees),
                         fun(NSubTrees) ->
-                                ZTree = erl_syntax:make_tree(erl_syntax:type(YNode), NSubTrees),
-                                ZNode = erl_syntax:revert(erl_syntax:copy_attrs(YNode, ZTree)),
+                                ZTree  = erl_syntax:make_tree(erl_syntax:type(YNode), NSubTrees),
+                                NZTree = erl_syntax:copy_attrs(YNode, ZTree),
+                                ZNode  = erl_syntax:revert(NZTree),
                                 F(post, ZNode)
                         end)
               end)
