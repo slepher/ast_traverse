@@ -19,9 +19,9 @@ where
     t a :: ast
     t b :: ast 
 
-## for one do not famillar with monad or do not want use monad
+## Without monad
 
-    map_reduce :: (pre | post, -> node -> state -> (node, state)) -> init_state -> ast -> (ast, state)
+    mapfold :: (pre | post, -> node -> state -> (node, state)) -> init_state -> ast -> (ast, state)
 
     map_with_state :: (pre | post, -> node -> state -> (node, state)) -> init_state -> ast -> ast
 
