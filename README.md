@@ -57,20 +57,12 @@ where
     
     (post, form,  form1)
     
-    (pre,  forms, [form2, form3])
-    
     (pre,  form,  form2)
     
     (post, form,  form2)
     
-    (pre,  forms, [form3])
-    
     (pre,  form,  form3)
     
     (post, form,  form3)
-    
-    (post, forms, [form3])
-    
-    (post, forms, [form2, form3])
     
     (post, forms, [form1, form2, form3])

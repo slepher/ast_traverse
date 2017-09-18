@@ -91,10 +91,13 @@ c({LG, LP}, {KG, KP}) ->
 setnth(1, [_|Rest], New) -> [New|Rest];
 setnth(I, [E|Rest], New) -> [E|setnth(I-1, Rest, New)].
 
-children(_Type, _ChildType, []) ->
-    [];
-children(Type, ChildType, [_H|_T]) ->
-    [{ChildType, lens_lh()}, {Type, lens_lt()}].
+children(_Type, ChildType, Children) ->
+    lists:map(fun(N) -> {ChildType, lens_l(N)} end, lists:seq(1, length(Children))).
+
+%%children(_Type, _ChildType, []) ->
+%%    [];
+%%children(Type, ChildType, [_H|_T]) ->
+%%    [{ChildType, lens_lh()}, {Type, lens_lt()}].
 
 children_lens(Type, Node) ->
     ?MODULE:Type(Node).
