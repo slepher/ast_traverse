@@ -1,50 +1,78 @@
-%% ``Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%% 
 %%%-------------------------------------------------------------------
 %%% @author Chen Slepher <slepheric@gmail.com>
 %%% @copyright (C) 2017, Chen Slepher
 %%% @doc
 %%%
 %%% @end
-%%% Created : 30 Aug 2017 by Chen Slepher <slepheric@gmail.com>
+%%% Created : 18 Sep 2017 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
 -module(ast_traverse).
+
+%% API
 -export([map_with_state/3, map/2, reduce/3]).
--export([map_reduce/3, map_m/3]).
--export([map_with_state/4, map/3, reduce/4]).
--export([map_reduce/4, map_m/4]).
--export([read/1, attributes/2]).
+-export([mapfold/3]).
+-export([map_m/3]).
+-export([attributes/2, read/1]).
 
--spec map_with_state(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Forms) -> Forms.
+%%%===================================================================
+%%% API
+%%%===================================================================
+
+-spec map_with_state(fun((_Type, Node, State) -> {Node, State}), State, Node) -> Node.
 map_with_state(F, Init, Forms) ->
-    map_with_state(F, Init, Forms, forms).
+    {NForms, _State} = mapfold(F, Init, Forms),
+    NForms.
 
--spec map(fun((_Type, _NodeType, Node) -> Node), Forms) -> Forms.
-map(F, Forms) ->
-    map(F, Forms, forms).
+-spec map(fun((_Type, Node) -> Node), Node) -> Node.
+map(F, TopNode) ->
+    map_with_state(fun(Type, NodeType, Node, State) -> {F(Type, NodeType, Node), State} end, ok, TopNode).
 
--spec reduce(fun((_Type, _NodeType, _Node, State) -> State), State, _Forms) -> State.
-reduce(F, Init, Forms) ->
-    reduce(F, Init, Forms, forms).
+-spec reduce(fun((_Type, Node, State) -> State), State, Node) -> State.
+reduce(F, Init, TopNode) ->
+    {_NForms, NState} = 
+        mapfold(fun(Type, Node, State) -> {Node, F(Type, Node, State)} end, Init, TopNode),
+    NState.
 
--spec map_reduce(fun((_Type, _NodeType, Node, State) -> {Node, State}), State, Ast) -> {Ast, State}.
-map_reduce(F, Init, Forms) ->
-    map_reduce(F, Init, Forms, forms).
+-spec mapfold(fun((_Type, Node, State) -> {Node, State}), State, Node) -> {Node, State}.
+mapfold(F, Init, TopNode) ->
+    STNode = map_m(ast_state, 
+                   fun(Type, Node) -> fun(State) -> F(Type, Node, State) end end, TopNode),
+    ast_state:run(STNode, Init).
 
--spec map_m(M, fun((_Type, _NodeType, Node) -> ast_monad:monadic(M, Node)), Ast) ->
-                   ast_monad:monadic(M, Ast) when M :: ast_monad:monad().
-map_m(Monad, F, Forms) ->
-    map_m(Monad, F, Forms, forms).
+-spec map_m(M, fun((_Type, Node) -> ast_monad:monadic(M, Node)), Node) -> 
+                   ast_monad:monadic(M, Node) when M :: ast_monad:monad().
+map_m(Monad, F, Nodes) when is_list(Nodes) ->
+    ast_monad:map_m(
+      Monad,
+      fun(Subtree) ->
+              map_m(Monad, F, Subtree)
+      end, Nodes);
+map_m(Monad, F, XNode) ->
+    case erl_syntax:subtrees(XNode) of
+        [] ->
+            F(leaf, XNode);
+        Subtrees ->
+            %% do form
+            %% do([Monad ||
+            %%           YNode <- F(pre, XNode),
+            %%           ZNode <- map_m(Monad, F, Subtrees),
+            %%           F(post, ZNode)
+            %%    ]).
+            ast_monad:bind(
+              Monad,
+              F(pre, XNode),
+              fun(YNode) ->
+                      ast_monad:bind(
+                        Monad,
+                        %% type of y node should be same as type of x node
+                        map_m(Monad, F, Subtrees),
+                        fun(NSubTrees) ->
+                                ZTree = erl_syntax:make_tree(erl_syntax:type(YNode), NSubTrees),
+                                ZNode = erl_syntax:revert(erl_syntax:copy_attrs(YNode, ZTree)),
+                                F(post, ZNode)
+                        end)
+              end)
+    end.
 
 %% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
@@ -76,63 +104,6 @@ attributes(Attribute, Forms) ->
               Acc
       end, [], Forms).
 
--spec map_with_state(fun((_Type, NodeType, Node, State) -> {Node, State}), State, Node, NodeType) -> Node.
-map_with_state(F, Init, Forms, TopNodeType) ->
-    {NForms, _State} = map_reduce(F, Init, Forms, TopNodeType),
-    NForms.
-
--spec map(fun((_Type, NodeType, Node) -> Node), Node, NodeType) -> Node.
-map(F, TopNode, TopNodeType) ->
-    map_with_state(fun(Type, NodeType, Node, State) -> {F(Type, NodeType, Node), State} end, ok, TopNode, TopNodeType).
-
--spec reduce(fun((_Type, NodeType, Node, State) -> State), State, Node, NodeType) -> State.
-reduce(F, Init, TopNode, TopNodeType) ->
-    {_NForms, NState} = 
-        map_reduce(fun(Type, NodeType, Node, State) -> {Node, F(Type, NodeType, Node, State)} end, Init, TopNode, TopNodeType),
-    NState.
-
--spec map_reduce(fun((_Type, NodeType, Node, State) -> {Node, State}), State, Node, NodeType) -> {Node, State}.
-map_reduce(F, Init, TopNode, TopNodeType) ->
-    STNode = map_m(ast_state, 
-                   fun(Type, NodeType, Node) -> fun(State) -> F(Type, NodeType, Node, State) end end, TopNode, TopNodeType),
-    ast_state:run(STNode, Init).
-
--spec map_m(M, fun((_Type, NodeType, Node) -> ast_monad:monadic(M, Node)), Node, NodeType) -> 
-                   ast_monad:monadic(M, Node) when M :: ast_monad:monad().
-map_m(Monad, F, XNode, NodeType) ->
-    %% do form
-    %% do([Monad ||
-    %%           YNode <- F(pre, XNode),
-    %%           ZNode <- fold_children(Monad, F, YNode, ast_lens:node_lens(XNodeType, YNode)),
-    %%           F(post, ZNode)
-    %%    ]).
-    ast_monad:bind(
-      Monad,
-      F(pre, NodeType, XNode),
-      fun(YNode) ->
-              ast_monad:bind(
-                Monad,
-                %% type of y node should be same as type of x node
-                fold_children(Monad, F, YNode, NodeType),
-                fun(ZNode) ->
-                        F(post, NodeType, ZNode)
-                end)
-      end).
-
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-fold_children(Monad, F, Node, NodeType) ->
-    ChildrenLens = ast_lens:children_lens(NodeType, Node),
-    lists:foldl( 
-      fun({ChildNodeType, ChildLens}, MNode) ->
-              ast_monad:bind(
-                Monad, MNode,
-                fun(NodeAcc) ->
-                        (ast_lens:modify(Monad, ChildLens, 
-                                         fun(Child) ->
-                                                 map_m(Monad, F, Child, ChildNodeType)
-                                         end))(NodeAcc)
-                end)
-      end, ast_monad:return(Monad, Node), ChildrenLens).
