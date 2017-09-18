@@ -79,7 +79,7 @@ where
     
     (post, patterns, [pattern1, pattern2])
     
-    (pre,  guards,  [[guard_test1]])
+    (pre,  guards, [[guard_test1]])
     
     (pre,  guard,  [guard_test1])
     
@@ -87,23 +87,23 @@ where
     
     (post, guard_test, guard_test1)
     
-    (post, guard, [guard_test1])
+    (post, guard,  [guard_test1])
     
-    (post, guards [[guard_test1]])
+    (post, guards, [[guard_test1]])
     
     (pre,  expressions, [expression1, expression2])
     
-    (pre,  expression, expression1)
+    (pre,  expression,  expression1)
     
-    (post, expression, expression1)
+    (post, expression,  expression1)
     
-    (pre,  expression, expression2)
+    (pre,  expression,  expression2)
     
-    (post, expression, expression2)
+    (post, expression,  expression2)
     
     (post, expressions, [expression1, expression2])
     
-    (post, fun_cluase, funnction_clause1)
+    (post, fun_cluase,  funnction_clause1)
     
     (post, fun_clauses, [function_clause1])
     
