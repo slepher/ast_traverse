@@ -48,31 +48,37 @@ map_m(Monad, F, Nodes) when is_list(Nodes) ->
               map_m(Monad, F, Subtree)
       end, Nodes);
 map_m(Monad, F, XNode) ->
-    case erl_syntax:subtrees(XNode) of
-        [] ->
-            F(leaf, XNode);
-        Subtrees ->
-            %% do form
-            %% do([Monad ||
-            %%           YNode <- F(pre, XNode),
-            %%           NSubtrees <- map_m(Monad, F, Subtrees),
-            %%           ZNode = erl_syntax:revert(erl_syntax:update_tree(YNode, NSubTrees)),
-            %%           F(post, ZNode)
-            %%    ]).
-            ast_monad:bind(
-              Monad,
-              F(pre, XNode),
-              fun(YNode) ->
+    PreType = 
+        case erl_syntax:subtrees(XNode) of
+            [] ->
+                leaf;
+            _Subtrees ->
+                pre
+        end,
+    %% do form
+    %% do([Monad ||
+    %%           YNode <- F(pre, XNode),
+    %%           NSubtrees <- map_m(Monad, F, Subtrees),
+    %%           ZNode = erl_syntax:revert(erl_syntax:update_tree(YNode, NSubTrees)),
+    %%           F(post, ZNode)
+    %%    ]).
+    ast_monad:bind(
+      Monad,
+      F(PreType, XNode),
+      fun(YNode) ->
+              case erl_syntax:subtrees(YNode) of
+                  [] ->
+                      ast_monad:return(Monad, YNode);
+                  Subtrees ->
                       ast_monad:bind(
                         Monad,
-                        %% type of y node should be same as type of x node
                         map_m(Monad, F, Subtrees),
                         fun(NSubTrees) ->
                                 ZNode = erl_syntax:revert(erl_syntax:update_tree(YNode, NSubTrees)),
                                 F(post, ZNode)
                         end)
-              end)
-    end.
+              end
+      end).
 
 %% this method is from https://github.com/efcasado/forms/blob/master/src/forms.erl
 -spec read(atom() | iolist()) -> [erl_parse:abstract_form()].
