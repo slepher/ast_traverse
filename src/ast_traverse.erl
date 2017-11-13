@@ -12,7 +12,7 @@
 -export([map_with_state/3, map/2, reduce/3]).
 -export([mapfold/3]).
 -export([map_m/3]).
--export([attributes/2, read/1]).
+-export([attributes/2, attributes_with_line/2, from_value/2, read/1]).
 
 %%%===================================================================
 %%% API
@@ -109,6 +109,29 @@ attributes(Attribute, Forms) ->
          (_Other, Acc) ->
               Acc
       end, [], Forms).
+
+attributes_with_line(Attribute, Forms) ->
+    lists:foldl(
+      fun({attribute, Line, Attr, Values}, Acc) when Attr == Attribute ->
+              [{Line, Values}|Acc];
+         (_Other, Acc) ->
+              Acc
+      end, [], Forms).
+
+from_value(Line, Tuple) when is_tuple(Tuple) ->
+    {tuple, Line, lists:map(fun(Element) -> from_value(Line, Element) end, tuple_to_list(Tuple))};
+from_value(Line, [H|T]) ->
+    {cons, Line, from_value(Line, H), from_value(Line, T)};
+from_value(Line, []) ->
+    {nil, Line};
+from_value(Line, '_') ->
+    {var, Line, '_'};
+from_value(Line, Value) when is_atom(Value) ->
+    {atom, Line, Value};
+from_value(Line, Value) when is_integer(Value) ->
+    {integer, Line, Value};
+from_value(Line, Value) when is_float(Value) ->
+    {float, Line, Value}.
 
 %%%===================================================================
 %%% Internal functions
