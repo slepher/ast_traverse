@@ -12,7 +12,7 @@
 -export([map_with_state/3, map/2, reduce/3]).
 -export([mapfold/3]).
 -export([map_m/3]).
--export([attributes/2, attributes_with_line/2, from_value/2, read/1]).
+-export([attributes/2, attributes_with_line/2, module_attributes/2, from_value/2, read/1]).
 
 %%%===================================================================
 %%% API
@@ -102,6 +102,16 @@ read(File) ->
     end.
 
 -spec attributes(atom(), _Forms) -> [_Attribute].
+
+module_attributes(Attribute, Module) ->
+    Attributes = Module:module_info(attributes),
+    lists:foldl(
+      fun({Attr, Value}, Acc) when Attr == Attribute ->
+              [Value|Acc];
+         (_Other, Acc) ->
+              Acc
+      end, [], Attributes).
+
 attributes(Attribute, Forms) ->
     lists:foldl(
       fun({attribute, _Line, Attr, Values}, Acc) when Attr == Attribute ->
