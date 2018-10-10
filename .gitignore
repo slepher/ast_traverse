@@ -5,3 +5,4 @@ ebin
 logs
 *.plt
 deps
+_build
