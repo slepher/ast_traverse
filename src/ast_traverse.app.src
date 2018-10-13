@@ -1,6 +1,7 @@
-{application, ast_traverse,
- [{description, "Erlang AST traverse"},
+{application, ast_traverse, [
+  {description, "Erlang AST traverse"},
   {vsn, "0.1"},
   {modules, []},
   {registered, []},
-  {applications, [kernel, stdlib, sasl, syntax_tools]}]}.
+  {applications, [kernel, stdlib, sasl, syntax_tools]}
+]}.

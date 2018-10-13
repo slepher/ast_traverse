@@ -6,3 +6,5 @@ logs
 *.plt
 deps
 _build
+.rebar3
+rebar.lock
