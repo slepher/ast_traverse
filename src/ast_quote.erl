@@ -27,10 +27,10 @@ format_error(Message) ->
 quote(Value) ->
     quote(Value, 0).
 
-quote({call, Line1, {atom, Line2, unquote}, [Value]}, _Line) ->
-    io:format("value is ~p", [Value]),
-    Value;
-    %{call, Line1, {remote, Line1, {atom, Line2, ast_quote}, {atom, Line2, quote}}, [Value]};
+quote({call, _Line1, {atom, _Line2, unquote}, [Unquote]}, _Line) ->
+    Unquote;
+quote({call, Line1, {atom, _Line2, unquote_splicing}, Unquotes}, _Line) ->
+    {block, Line1, Unquotes};
 quote(Tuple, Line) when is_tuple(Tuple) ->
     TupleList = tuple_to_list(Tuple),
     QuotedLine = 
