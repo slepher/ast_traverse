@@ -10,7 +10,7 @@
 
 %% API
 -export([parse_transform/2, format_error/1]).
--export([quote/1, quote/2]).
+-export([quote/1, quote/2, replace_line/2]).
 
 %%%===================================================================
 %%% API
@@ -24,6 +24,20 @@ format_error(Message) ->
         _    -> io_lib:write(Message)
     end.
 
+replace_line(Ast, Line) ->
+    ast_traverse:map(
+      fun(Type, Tuple) when is_tuple(Tuple) and ((Type == pre) or (Type == leaf)) ->
+              TupleList = tuple_to_list(Tuple),
+              case TupleList of
+                  [_Action, TupleLine|_Rest] when is_integer(TupleLine) ->
+                      setelement(2, Tuple, Line);
+                  _ ->
+                      Tuple
+              end;
+         (_, Node) ->
+              Node
+         end, Ast).
+
 quote(Value) ->
     quote(Value, 0).
 
@@ -35,7 +49,7 @@ quote(Tuple, Line) when is_tuple(Tuple) ->
     TupleList = tuple_to_list(Tuple),
     QuotedLine = 
         case TupleList of
-            [_Action, TupleLine|_Rest] ->
+            [_Action, TupleLine|_Rest] when is_integer(TupleLine) ->
                 TupleLine;
             _ ->
                 Line
@@ -52,6 +66,7 @@ quote(Integer, Line) when is_integer(Integer) ->
 quote(Atom, Line) when is_atom(Atom) ->
     {atom, Line, Atom}.
 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -63,5 +78,7 @@ quote(Atom, Line) when is_atom(Atom) ->
 %%%===================================================================
 walk(pre, {call, _Line1, {atom, Line2, quote}, [Form]}) ->
     quote(Form, Line2);
+walk(pre, {call, Line1, {atom, Line2, quote}, [Form, Line]}) ->
+    {call, Line1, {remote, Line2, {atom, Line2, ast_quote}, {atom, Line2, replace_line}}, [quote(Form, Line2), Line]};
 walk(_Type, Node) ->
     Node.
