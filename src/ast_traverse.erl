@@ -13,6 +13,7 @@
 -export([mapfold/3]).
 -export([map_m/3]).
 -export([attributes/2, attributes_with_line/2, module_attributes/2, from_value/2, read/1]).
+-export([file/1]).
 
 %%%===================================================================
 %%% API
@@ -111,6 +112,10 @@ module_attributes(Attribute, Module) ->
          (_Other, Acc) ->
               Acc
       end, [], Attributes).
+
+file(Forms) ->
+    [{File, _}] = ast_traverse:attributes(file, Forms),
+    File.
 
 attributes(Attribute, Forms) ->
     lists:foldl(

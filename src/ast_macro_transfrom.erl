@@ -15,29 +15,9 @@
 %%% API
 %%%===================================================================
 parse_transform(Forms, _Options) ->
-    [{File, _}] = ast_traverse:attributes(file, Forms),
-    Macros = macros(Forms),
-    Replaces = replaces(Macros),
-    NForms = 
-        lists:foldl(
-          fun({function, _Line, Name, 0, [{clause, _, [], [], [Expression]}]} = Node, Acc) ->
-                  case maps:find(Name, Replaces) of
-                      {ok, {Module, Function}} ->
-                          case walk_node(Expression, maps:with([{Module, Function}], Macros), File) of
-                              not_match ->
-                                  [Node|Acc];
-                              Nodes when is_list(Nodes) ->
-                                  lists:reverse(Nodes) ++ Acc;
-                              NNode ->
-                                  [NNode|Acc]
-                          end;
-                      error ->
-                          [Node|Acc]
-                  end;
-             (Node, Acc) ->
-                  [Node|Acc]
-          end, [], Forms),
-    ast_traverse:map(fun(Type, Node) -> walk_macros(Type, Node, Macros, File) end, lists:reverse(NForms)).
+    File = file(Forms),
+    Macros = macros(Forms, File),
+    ast_traverse:map(fun(Type, Node) -> walk_macros(Type, Node, Macros, File) end, Forms).
 
 format_error(Message) ->
     case io_lib:deep_char_list(Message) of
@@ -84,40 +64,42 @@ format_node(File, Line, Module, Function, Nodes, Opts) ->
             ok
     end.
 
-macros(Forms) ->
+macros(Forms, File) ->
     Macros = lists:flatten(ast_traverse:attributes_with_line(import_macro, Forms)),
     lists:foldl(
       fun({Line, {Module, Function}}, Acc) ->
-              add_macro(Module, Function, [], Line, Acc);
+              add_macro(Module, Function, [], File, Line, Acc);
          ({Line, {Module, Function, Opts}}, Acc) when is_list(Opts)->
-              add_macro(Module, Function, Opts, Line, Acc);
+              add_macro(Module, Function, Opts, File, Line, Acc);
          ({Line, Other}, Acc) ->
               io:format("invalid import macro ~p at ~p~n", [Other, Line]),
               Acc
       end, maps:new(), Macros).
 
-add_macro(Module, Function, Options, Line, Acc) ->
-    case erlang:function_exported(Module, Function, 1) of
-        true ->
-            maps:put({Module, Function}, Options, Acc);
-        false ->
-            io:format("unexported macro ~p:~p at ~p~n", [Module, Function, Line]),
+add_macro(Module, Function, Options, File, Line, Acc) ->
+    case get_exports(Module) of
+        {ok, Exports} ->
+            case lists:member({Function, 1}, Exports) of
+                true ->
+                    maps:put({Module, Function}, Options, Acc);
+                false ->
+                    io:format("~s:~p unexported macro ~p:~p~n", [File, Line, Module, Function]),
+                    Acc
+            end;
+        {error, undef} ->
+            Msg = "~s:~p module ~p could not be loaded, add to erl_first_files in rebar.config to make it compile first.~n",
+            io:format(Msg, [File, Line, Module]),
             Acc
     end.
-              
-replaces(Macros) ->
-    maps:fold(
-      fun({Module, Function}, Opts, Acc) ->
-              case proplists:get_value(replace_functions, Opts, undefined) of
-                  undefined ->
-                      Acc;
-                  ReplaceFunctions when is_list(ReplaceFunctions) ->
-                      lists:foldl(
-                        fun(Name, Acc1) ->
-                                maps:put(Name, {Module, Function}, Acc1)
-                        end, Acc, ReplaceFunctions);
-                  FunctionName ->
-                      maps:put(FunctionName, {Module, Function}, Acc)
-              end
-      end, maps:new(), Macros).
+
+get_exports(Module) ->
+    try
+        {ok, Module:module_info(exports)}
+    catch
+        _:undef ->
+            {error, undef}
+    end.
                       
+file(Forms) ->
+    [{File, _}] = ast_traverse:attributes(file, Forms),
+    filename:basename(File).
