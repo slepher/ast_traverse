@@ -15,7 +15,7 @@
 %%% API
 %%%===================================================================
 parse_transform(Forms, _Options) ->
-    File = file(Forms),
+    File = ast_traverse:file(Forms),
     Macros = macros(Forms, File),
     ast_traverse:map(fun(Type, Node) -> walk_macros(Type, Node, Macros, File) end, Forms).
 
@@ -99,7 +99,3 @@ get_exports(Module) ->
         _:undef ->
             {error, undef}
     end.
-                      
-file(Forms) ->
-    [{File, _}] = ast_traverse:attributes(file, Forms),
-    filename:basename(File).

@@ -106,32 +106,35 @@ read(File) ->
 
 module_attributes(Attribute, Module) ->
     Attributes = Module:module_info(attributes),
-    lists:foldl(
-      fun({Attr, Value}, Acc) when Attr == Attribute ->
-              [Value|Acc];
-         (_Other, Acc) ->
-              Acc
-      end, [], Attributes).
+    lists:reverse(
+      lists:foldl(
+        fun({Attr, Value}, Acc) when Attr == Attribute ->
+                [Value|Acc];
+           (_Other, Acc) ->
+                Acc
+        end, [], Attributes)).
 
 file(Forms) ->
-    [{File, _}] = ast_traverse:attributes(file, Forms),
+    [{File, _}|_] = attributes(file, Forms),
     File.
 
 attributes(Attribute, Forms) ->
-    lists:foldl(
-      fun({attribute, _Line, Attr, Values}, Acc) when Attr == Attribute ->
-              [Values|Acc];
-         (_Other, Acc) ->
-              Acc
-      end, [], Forms).
+    lists:reverse(
+      lists:foldl(
+        fun({attribute, _Line, Attr, Values}, Acc) when Attr == Attribute ->
+                [Values|Acc];
+           (_Other, Acc) ->
+                Acc
+        end, [], Forms)).
 
 attributes_with_line(Attribute, Forms) ->
-    lists:foldl(
-      fun({attribute, Line, Attr, Values}, Acc) when Attr == Attribute ->
-              [{Line, Values}|Acc];
-         (_Other, Acc) ->
-              Acc
-      end, [], Forms).
+    lists:reverse(
+      lists:foldl(
+        fun({attribute, Line, Attr, Values}, Acc) when Attr == Attribute ->
+                [{Line, Values}|Acc];
+           (_Other, Acc) ->
+                Acc
+        end, [], Forms)).
 
 from_value(Line, Tuple) when is_tuple(Tuple) ->
     {tuple, Line, lists:map(fun(Element) -> from_value(Line, Element) end, tuple_to_list(Tuple))};
