@@ -10,7 +10,7 @@
 
 %% API
 -export([parse_transform/2, format_error/1]).
--export([quote/1, quote/2, replace_line/2]).
+-export([quote/1, quote/2, replace_line/2, merge_clauses/1]).
 
 %%%===================================================================
 %%% API
@@ -38,13 +38,25 @@ replace_line(Ast, Line) ->
               Node
          end, Ast).
 
+merge_clauses([{'fun', Line, {clauses, _}}|_T] = Nodes) -> 
+    NClauses = 
+        lists:flatten(
+          lists:map(
+            fun({'fun', _, {clauses, FClauses}}) ->
+                    FClauses
+            end, Nodes)),
+    {'fun', Line, {clauses, NClauses}}.
+
+
 quote(Value) ->
     quote(Value, 0).
 
 quote({call, _Line1, {atom, _Line2, unquote}, [Unquote]}, _Line) ->
     Unquote;
-quote({call, Line1, {atom, _Line2, unquote_splicing}, Unquotes}, _Line) ->
-    {block, Line1, Unquotes};
+quote([{call, _Line1, {atom, _Line2, unquote_splicing}, [Unquotes]}], _Line) ->
+    Unquotes;
+quote([{atom, _, unquote_splicing}|Unquotes], Line) ->
+    quote_list(Unquotes, Line);
 quote(Tuple, Line) when is_tuple(Tuple) ->
     TupleList = tuple_to_list(Tuple),
     QuotedLine = 
@@ -66,7 +78,10 @@ quote(Integer, Line) when is_integer(Integer) ->
 quote(Atom, Line) when is_atom(Atom) ->
     {atom, Line, Atom}.
 
-
+quote_list([H|T], Line) ->
+    {cons, Line, H, quote_list(T, Line)};
+quote_list([], Line) ->
+    {nil, Line}.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -77,7 +92,8 @@ quote(Atom, Line) when is_atom(Atom) ->
 %%% Internal functions
 %%%===================================================================
 walk(pre, {call, _Line1, {atom, Line2, quote}, [Form]}) ->
-    quote(Form, Line2);
+    Node = quote(Form, Line2),
+    Node;
 walk(pre, {call, Line1, {atom, Line2, quote}, [Form, Line]}) ->
     {call, Line1, {remote, Line2, {atom, Line2, ast_quote}, {atom, Line2, replace_line}}, [quote(Form, Line2), Line]};
 walk(_Type, Node) ->
